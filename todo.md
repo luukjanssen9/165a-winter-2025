@@ -12,22 +12,27 @@ to offer data manipulation and querying capabilities such as select, insert, upd
 
 
 ## Things to do: Implement the APIs
+one team should focus on the table stuff
+- Table class
+    -  "core of our relational storage functionality" (idk, it doesnt tell us what to implement specifically)
 - Database class
     -  create table function
     -  drop table function
+
+another team should focus on the page stuff
+- Page class
+    -  keep in mind that base pages and tail pages should be indentical from the hardware's POV
+- Index class
+    -  create_index function
+    -  drop_index function
+
+query requires tables and pages to be done, we should save it for last. it should be relatively simple once we understand the structure of the system
 - Query class
     -  select function
     -  insert function
     -  update function
     -  delete function
     -  sum function
-- Table class
-    -  "core of our relational storage functionality" (idk, it doesnt tell us what to implement specifically)
-- Index class
-    -  create_index function
-    -  drop_index function
-- Page class
-    -  keep in mind that base pages and tail pages should be indentical from the hardware's POV
 
 - config.py
     -  "centralized storage for all the configuration options and the constant values used in the code" 
