@@ -21,18 +21,24 @@ class Database():
     """
     def create_table(self, name, num_columns, key_index):
         table = Table(name, num_columns, key_index)
-        return table
+        if table.name not in self.tables:
+            self.tables.append(table)
+            return table
+        else: print(f"error: A table with the name \"{table.name}\" already exists")
 
     
     """
     # Deletes the specified table
     """
     def drop_table(self, name):
-        pass
-
+        for table in self.tables:
+            if table.name==name:
+                del table
     
     """
     # Returns table with the passed name
     """
     def get_table(self, name):
-        pass
+        for table in self.tables:
+            if table.name==name:
+                return table
