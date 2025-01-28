@@ -13,26 +13,26 @@
 
 ## Things to do: Implement the APIs
 - Database class
- - create table function
- - drop table function
+      -  create table function
+      -  drop table function
 - Query class
- - select function
- - insert function
- - update function
- - delete function
- - sum function
+      -  select function
+      -  insert function
+      -  update function
+      -  delete function
+      -  sum function
 - Table class
- - "core of our relational storage functionality" (idk, it doesnt tell us what to implement specifically)
+    -  "core of our relational storage functionality" (idk, it doesnt tell us what to implement specifically)
 - Index class
- - create_index function
- - drop_index function
+      -  create_index function
+      -  drop_index function
 - Page class
- - keep in mind that base pages and tail pages should be indentical from the hardware's POV
+      -  keep in mind that base pages and tail pages should be indentical from the hardware's POV
 
 - config.py
- - "centralized storage for all the configuration options and the constant values used in the code" 
+      -  "centralized storage for all the configuration options and the constant values used in the code" 
 - be able to run main.py
- - used for the autograder
+      -  used for the autograder
 
 ## Extra things to implement for an A+:
 - indexing functionality (primary and/or secondary indexes) (using hash tables or trees)
