@@ -34,6 +34,8 @@ class Database():
         for table in self.tables:
             if table.name==name:
                 del table
+                return
+        print(f"error: No table with the name \"{name}\" exists")
     
     """
     # Returns table with the passed name
@@ -42,3 +44,4 @@ class Database():
         for table in self.tables:
             if table.name==name:
                 return table
+        print(f"error: No table with the name \"{name}\" exists")

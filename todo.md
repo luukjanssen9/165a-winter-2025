@@ -16,8 +16,8 @@ one team should focus on the table stuff
 - Table class
     -  "core of our relational storage functionality" (idk, it doesnt tell us what to implement specifically)
 - Database class
-    -  create table function
-    -  drop table function
+    -  ~~create table function~~
+    -  ~~drop table function~~
 
 another team should focus on the page stuff
 - Page class
