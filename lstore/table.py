@@ -32,4 +32,23 @@ class Table:
     def __merge(self):
         print("merge is happening")
         pass
+
+    def __insert(self, record):
+        #TODO: find an available page or create a new one
+
+        #TODO: write record to page
+
+        #TODO: update page directory
+        self.page_directory[record.rid] = record
+        
+        pass
+
+    def __delete(self, key):
+        # TODO: delete record from page
+
+        # TODO: update page directory
+        pass
+
+    def __update(self, key, value):
+        pass
  
