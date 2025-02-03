@@ -39,19 +39,26 @@ class Table:
         pass
 
     def __insert(self, record):
-        #TODO: find an available page or create a new one
-        #__findAvailablePageOrCreateNewOne
+        #TODO: find an available page or create a new one for each column
+        #__findAvailablePageOrCreateNewOne()
                 
-        #TODO: write record to page
-
+        #TODO: write value to page
+        # 
         #TODO: update page directory
 
         #TODO: update index
         pass
 
     def __findAvailablePageOrCreateNewOne(self, record):
-        
-                
+        #TODO: find an available page or create a new one
+        # pages are stored in self.pages
+        # how do we find pages for a certain column?
+        # do we loop through the values in the record and find pages associated with each value?
+        # or do we loop through the columns and find pages associated with each column?
+
+        # if there are no pages, create a new page
+        # page = Page()
+        # return page
         pass
 
     def __delete(self, key):
