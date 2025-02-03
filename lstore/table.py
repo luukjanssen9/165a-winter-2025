@@ -40,16 +40,19 @@ class Table:
 
     def __insert(self, record):
         #TODO: find an available page or create a new one for each column
-        #__findAvailablePageOrCreateNewOne()
-                
-        #TODO: write value to page
-        # 
+        for i in range(0, self.num_columns):
+            page = self.__findAvailablePageOrCreateNewOne(record.columns[i])
+            #TODO: write value to page
+            page.write(record.columns[i])
+            
         #TODO: update page directory
+        # this means that if we give the rid to the page directory then it should be able to return all the pages for each individual column?       
+        
 
         #TODO: update index
         pass
 
-    def __findAvailablePageOrCreateNewOne(self, record):
+    def __findAvailablePageOrCreateNewOne(self, value):
         #TODO: find an available page or create a new one
         # pages are stored in self.pages
         # how do we find pages for a certain column?
@@ -57,9 +60,9 @@ class Table:
         # or do we loop through the columns and find pages associated with each column?
 
         # if there are no pages, create a new page
-        # page = Page()
-        # return page
-        pass
+        page = Page()
+        return page
+        
 
     def __delete(self, key):
         # TODO: delete record from page
