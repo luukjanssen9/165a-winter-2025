@@ -2,10 +2,10 @@ from lstore.index import Index
 from time import time
 from lstore.page import Page
 
-INDIRECTION_COLUMN = 0
-RID_COLUMN = 1
-TIMESTAMP_COLUMN = 2
-SCHEMA_ENCODING_COLUMN = 3
+INDIRECTION_COLUMN = 0 # Each record also includes an indirection column that points to the latest tail record holding the latest update to the record
+RID_COLUMN = 1 # Each record is assigned a unique identier called an RID, which is often the physical location where the record is actually stored.
+TIMESTAMP_COLUMN = 2 # Not sure what this is for ?
+SCHEMA_ENCODING_COLUMN = 3 # This is a bit vector with one bit per column that stores information about the updated state of each column
 
 
 class Record:
@@ -49,7 +49,9 @@ class Table:
         #TODO: update index
         pass
 
-    def __findAvailablePageOrCreateNewOne():
+    def __findAvailablePageOrCreateNewOne(self, record):
+        
+                
         pass
 
     def __delete(self, key):
