@@ -1,6 +1,8 @@
 from lstore.table import Table, Record
 from lstore.index import Index
 from lstore.page import Page
+from time import time
+from lstore.page import PageGroup, pageRange
 
 
 class Query:
@@ -12,6 +14,7 @@ class Query:
     """
     def __init__(self, table):
         self.table = table
+        self.rid_counter = 0 # counter to keep track of the number of records in the table
         pass
 
     
@@ -34,14 +37,31 @@ class Query:
     # Returns False if insert fails for whatever reason
     """
     def insert(self, *columns):
-        # this will change in updating 
-        schema_encoding = '0' * self.table.num_columns
-        #TODO: find an available page or create a new one
-        # Iterate through page_range to find the right range
-        # Iterate through Base pages to find one with capacity
-        # save num_records in the page, use that to find the index of the record
+        #TODO: should metadata be generated here or in table.py?
+        # Generate metadata
+        rid = self.rid_counter
+        self.rid_counter += 1
+        schema_encoding = '0' * self.table.num_columns  # No updates yet
+        timestamp = int(time())  # Store current timestamp
+        indirection = rid  # Initially points to itself
+        
+        # Convert into a full record format
+        record = [indirection, rid, timestamp, schema_encoding] + list(columns)
 
-        #TODO: write record 
+        # Find available page to write to
+        # Iterate through page_range to find the right range
+        for page_range in self.table.page_ranges:
+            # Iterate through Base pages to find one with capacity
+            for base_page in page_range.base_pages:
+                if base_page.has_capacity():
+                    #TODO: write record
+                    # writing logic is not fully correct yet
+                    base_page.write(*record)
+        
+        #if no page has capacity, create a new page
+        new_page_range = pageRange()
+        new_base_page = PageGroup()
+        
             
         #TODO: update page directory
         # RID - > {Page_range#, Base_page#, index#}       
@@ -49,11 +69,7 @@ class Query:
 
         #TODO: update index
         pass
-
-    def __findAvailablePageOrCreateNewOne(self):
-        
-        pass
-        
+   
     
     """
     # Read matching record with specified search key
