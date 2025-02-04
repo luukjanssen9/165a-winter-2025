@@ -36,33 +36,23 @@ class Query:
     def insert(self, *columns):
         # this will change in updating 
         schema_encoding = '0' * self.table.num_columns
-        
-        #TODO: find an available page or create a new one for each column
-        for i in range(0, self.num_columns):
-            page = self.__findAvailablePageOrCreateNewOne(i)
-            #TODO: write value to page
-            page.write(columns[i])
+        #TODO: find an available page or create a new one
+        # Iterate through page_range to find the right range
+        # Iterate through Base pages to find one with capacity
+        # save num_records in the page, use that to find the index of the record
+
+        #TODO: write record 
             
         #TODO: update page directory
-        # this means that if we give the rid to the page directory then it should be able to return all the pages for each individual column?
-        # RID - > {page1, page2, page3, page4, etc.}       
+        # RID - > {Page_range#, Base_page#, index#}       
         
 
         #TODO: update index
         pass
 
-    def __findAvailablePageOrCreateNewOne(self, i):
-        #TODO: find an available page or create a new one
-        # pages are stored in self.page_range
-
-        # loop through the page range for the given column
-        for page in self.page_range[i]: #maybe not indexed correctly?
-            if page.hasCapacity():
-                return page
-
-        # if there are no pages, create a new page
-        page = Page()
-        return page
+    def __findAvailablePageOrCreateNewOne(self):
+        
+        pass
         
     
     """

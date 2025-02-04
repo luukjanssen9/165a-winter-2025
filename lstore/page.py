@@ -28,12 +28,17 @@ class Page:
         return self.data[index]
 
 # BASE AND TAIL PAGE CLASS
-class PageGroup(Page):
+class PageGroup():
+    def __init__(self):
+        self.pages = []
     pass
     # contains an array of Pages
 
 # PAGE RANGE CLASS
-class pageRange(Page):
+class pageRange():
+    def __init__(self):
+        self.base_pages = []
+        self.tail_pages = []
     pass
     # contains an array of PageGroup (base pages)
     # contains an array of PageGroup (tail pages)
