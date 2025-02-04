@@ -35,9 +35,10 @@ class Query:
     """
     def insert(self, *columns):
         schema_encoding = '0' * self.table.num_columns
+
         #TODO: find an available page or create a new one for each column
         for i in range(0, self.num_columns):
-            page = self.__findAvailablePageOrCreateNewOne(columns[i])
+            page = self.__findAvailablePageOrCreateNewOne(i)
             #TODO: write value to page
             page.write(columns[i])
             
@@ -48,12 +49,16 @@ class Query:
         #TODO: update index
         pass
 
-    def __findAvailablePageOrCreateNewOne(self, column):
+    def __findAvailablePageOrCreateNewOne(self, i):
         #TODO: find an available page or create a new one
         # pages are stored in self.pages
         # how do we find pages for a certain column?
         # do we loop through the values in the record and find pages associated with each value?
         # or do we loop through the columns and find pages associated with each column?
+
+        for page in self.page_range[i]:
+            if page.hasCapacity():
+                return page
 
         # if there are no pages, create a new page
         page = Page()

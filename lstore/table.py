@@ -31,7 +31,7 @@ class Table:
         self.num_columns = num_columns
         self.page_directory = {}
         self.index = Index(self)
-        self.pages = []
+        self.page_range = [[] for _ in range(num_columns) ]
         pass
 
     def __merge(self):
