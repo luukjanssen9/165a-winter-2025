@@ -1,5 +1,5 @@
 ARRAY_SIZE = 4096
-VALUE_SIZE = 8
+VALUE_SIZE = 8 # 64 bit integer = 8 bytes
 
 # PHYSICAL PAGE CLASS
 class Page:
