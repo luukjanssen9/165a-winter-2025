@@ -1,4 +1,5 @@
 
+# PHYSICAL PAGE CLASS
 class Page:
 
     def __init__(self):
@@ -18,5 +19,20 @@ class Page:
             self.num_records += 1
         else:
             print("error: page is full")  
-        
 
+    def read(self, index):
+        if index>=4096:
+            print("error: invalid index")  
+            return
+        return self.data[index]
+
+# BASE AND TAIL PAGE CLASS
+class PageGroup(Page):
+    pass
+    # contains an array of Pages
+
+# PAGE RANGE CLASS
+class pageRange(Page):
+    pass
+    # contains an array of PageGroup (base pages)
+    # contains an array of PageGroup (tail pages)
