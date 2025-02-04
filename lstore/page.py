@@ -1,16 +1,17 @@
+ARRAY_SIZE = 4096
+VALUE_SIZE = 8
 
 # PHYSICAL PAGE CLASS
 class Page:
 
     def __init__(self):
         self.num_records = 0
-        self.data = bytearray(4096)
+        self.data = bytearray(ARRAY_SIZE)
 
     def has_capacity(self):
-        if self.num_records < 4096:
+        if self.num_records < ARRAY_SIZE/VALUE_SIZE:
             return True
         return False
-        
 
     def write(self, value):
         # append values until page is full
@@ -21,7 +22,7 @@ class Page:
             print("error: page is full")  
 
     def read(self, index):
-        if index>=4096:
+        if index>=(ARRAY_SIZE/VALUE_SIZE):
             print("error: invalid index")  
             return
         return self.data[index]
