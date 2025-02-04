@@ -34,8 +34,9 @@ class Query:
     # Returns False if insert fails for whatever reason
     """
     def insert(self, *columns):
+        # this will change in updating 
         schema_encoding = '0' * self.table.num_columns
-
+        
         #TODO: find an available page or create a new one for each column
         for i in range(0, self.num_columns):
             page = self.__findAvailablePageOrCreateNewOne(i)
@@ -43,7 +44,8 @@ class Query:
             page.write(columns[i])
             
         #TODO: update page directory
-        # this means that if we give the rid to the page directory then it should be able to return all the pages for each individual column?       
+        # this means that if we give the rid to the page directory then it should be able to return all the pages for each individual column?
+        # RID - > {page1, page2, page3, page4, etc.}       
         
 
         #TODO: update index
@@ -51,12 +53,10 @@ class Query:
 
     def __findAvailablePageOrCreateNewOne(self, i):
         #TODO: find an available page or create a new one
-        # pages are stored in self.pages
-        # how do we find pages for a certain column?
-        # do we loop through the values in the record and find pages associated with each value?
-        # or do we loop through the columns and find pages associated with each column?
+        # pages are stored in self.page_range
 
-        for page in self.page_range[i]:
+        # loop through the page range for the given column
+        for page in self.page_range[i]: #maybe not indexed correctly?
             if page.hasCapacity():
                 return page
 
