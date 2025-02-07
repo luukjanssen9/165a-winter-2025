@@ -29,7 +29,7 @@ class Table:
         self.name = name 
         self.key = key
         self.num_columns = num_columns
-        self.page_directory = {} # RID - > {base_page#, index#} 
+        self.page_directory = {} # RID - > {page_range_number, base_page_number, record_number} 
         self.index = Index(self)
         self.page_ranges = []
         pass
