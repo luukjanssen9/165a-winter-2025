@@ -53,19 +53,19 @@ class Query:
         primary_key = columns[self.table.key]  # Get primary key value
         # Check if primary key already exists
         for rid, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
-            stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[0].read(record_num)
+            stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[4].read(record_num)
             if stored_primary_key == primary_key:
                 return False  # Prevent duplicate insertion
         
         # Generate metadata
         rid = self.rid_counter
         self.rid_counter += 1
-        schema_encoding = '0' * self.table.num_columns  # No updates yet
+        schema_encoding = 0 
         timestamp = int(time())  # Store current timestamp
-        indirection = None # initially set to None
+        indirection = 0 # initially set to 0
         
         # Convert into a full record format
-        record = list(columns)  # Only store column data, no metadata
+        record = [indirection, rid, timestamp, schema_encoding, primary_key] + list(columns[1:])
 
         # Find available page to write to
         # Iterate through page_range to find the right range
@@ -86,7 +86,7 @@ class Query:
 
         #update page directory for hash table
         self.table.page_directory[rid] = (page_range_number, base_page_number, record_number)
-        
+         # Print debug statement after writing
         #TODO: update index
         return True
    
