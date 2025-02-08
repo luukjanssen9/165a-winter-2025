@@ -43,14 +43,10 @@ class PageGroup():
         return False
 
     def write(self, *record, offset_number):
-        # check if the number of columns is equal to the number of pages
-        if len(record) != len(self.pages):
-            print("error: column count mismatch")
-            return False
-        # If the BasePage is empty, create a new page for each column
-        if len(self.pages) == 0:
-            for i in range(len(record)):
-                self.pages.append(Page())
+        # Ensure the number of pages matches the number of columns
+        while len(self.pages) < len(record):
+            self.pages.append(Page())  # Dynamically add pages as needed
+       
         # write each column to the corresponding page
         for page, value in zip(self.pages, record):
             # we don't need to check if the page has capacity here because the modulo should ensure this
@@ -59,7 +55,7 @@ class PageGroup():
             #else:
                 # might have to change something here if the pages are full, i'm not sure
                 # print("error: no capacity in one of the pages")
-            return True
+        return True
 
 # PAGE RANGE CLASS
 class pageRange():

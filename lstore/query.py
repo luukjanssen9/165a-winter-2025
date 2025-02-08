@@ -33,7 +33,7 @@ class Query:
     def make_RID(range, basePage, record):
         return((range*8192)+(basePage*16)+(record))
 
-    def get_vals(rid):
+    def get_vals(self, rid):
         page_range = rid // 8192
         base_page = rid % 8192 // 512
         record = ((rid % 8192) % 512)
@@ -45,6 +45,18 @@ class Query:
     """
     def insert(self, *columns):
         #TODO: should metadata be generated here or in table.py?
+
+        # Validate column count
+        if len(columns) != self.table.num_columns:
+            return False  # Prevent insertion if column count is wrong
+
+        primary_key = columns[self.table.key]  # Get primary key value
+        # Check if primary key already exists
+        for rid, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
+            stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[0].read(record_num)
+            if stored_primary_key == primary_key:
+                return False  # Prevent duplicate insertion
+        
         # Generate metadata
         rid = self.rid_counter
         self.rid_counter += 1
@@ -53,20 +65,28 @@ class Query:
         indirection = None # initially set to None
         
         # Convert into a full record format
-        record = [rid, indirection, schema_encoding, timestamp] + list(columns)
+        record = list(columns)  # Only store column data, no metadata
 
         # Find available page to write to
         # Iterate through page_range to find the right range
         page_range_number, base_page_number, record_number = self.get_vals(rid)
         
-        # Write to the page
-        if self.table.page_ranges[page_range_number].base_pages[base_page_number].write(record, record_number)==False:
+        # Ensure page range exists
+        while len(self.table.page_ranges) <= page_range_number:
+         self.table.page_ranges.append(pageRange())
+
+        # Ensure base page exists in the page range
+        page_range = self.table.page_ranges[page_range_number]
+        while len(page_range.base_pages) <= base_page_number:
+            page_range.base_pages.append(PageGroup())
+
+        # Now it's safe to write
+        if page_range.base_pages[base_page_number].write(*record, offset_number=record_number) == False:
             return False
-           
+
         #update page directory for hash table
         self.table.page_directory[rid] = (page_range_number, base_page_number, record_number)
         
-
         #TODO: update index
         return True
    
