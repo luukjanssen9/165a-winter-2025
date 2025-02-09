@@ -141,3 +141,34 @@ def test_insert_metadata():
 
 
 test_insert_metadata()
+
+def test_insert_page_capacity():
+    from lstore.db import Database
+    from lstore.query import Query
+
+    db = Database()
+    table = db.create_table("Students", 5, 0)  # Assume 5 columns: 4 data + 1 for primary key
+    query = Query(table)
+
+    # Fill up the first page range (16 PageGroups, each with multiple pages)
+    # Assuming each base page can hold 512 records, and there are 16 page groups per page range.
+    records_per_base_page = 512  # Assuming each base page can hold 512 records
+    page_groups_per_page_range = 16
+    total_records_in_first_page_range = records_per_base_page * page_groups_per_page_range
+
+    # Insert enough records to fill the first page range (16 PageGroups)
+    for i in range(total_records_in_first_page_range):
+        result = query.insert(i + 1, 10, 20, 30, 40)  # Insert starting from RID 1
+        assert result == True, f"Insert failed at RID {i + 1}"
+
+    # Now, we should start inserting into a new page range.
+    result = query.insert(total_records_in_first_page_range + 1, 50, 60, 70, 80)
+    assert result == True, "Insert failed when starting a new page range"
+
+    # Insert more records to ensure new page ranges are being used correctly.
+    additional_records = 100
+    for i in range(total_records_in_first_page_range + 2, total_records_in_first_page_range + additional_records):
+        result = query.insert(i, 50, 60, 70, 80)  # Insert more records
+        assert result == True, f"Insert failed at RID {i}"
+
+test_insert_page_capacity()

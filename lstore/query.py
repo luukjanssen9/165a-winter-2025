@@ -69,7 +69,7 @@ class Query:
         # Iterate over page ranges to find a base page with capacity
         for pr_num, page_range in enumerate(self.table.page_ranges):
             for bp_num, base_page in enumerate(page_range.base_pages):
-                print(f"Checking capacity for Page Range {pr_num}, Base Page {bp_num}: {base_page.has_capacity()}")
+                # print(f"Checking capacity for Page Range {pr_num}, Base Page {bp_num}: {base_page.has_capacity()}")
                 if base_page.has_capacity():
                     page_range_number, base_page_number = pr_num, bp_num
                     record_number = base_page.pages[0].num_records  # Use next available slot
