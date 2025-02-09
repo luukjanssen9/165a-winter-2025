@@ -10,51 +10,46 @@ def test_insert_basic():
     # Step 2: Insert a Record
     result = query.insert(1, 10, 20, 30, 40)  # 5 values matching column count
 
-    # Step 3: Verify Page Directory
+    if not result:
+        print("Insert failed. Possible cause: No space in page group.")
+    
     print(f"Page Directory: {table.page_directory}")
 
-    # Step 4: Verify Data Storage
-    page_range_number, base_page_number, record_number = table.page_directory[0]
-    print(f"Page Range Number: {page_range_number}, Base Page Number: {base_page_number}, Record Number: {record_number}")
-    stored_values = table.page_ranges[page_range_number].base_pages[base_page_number].pages
-    print(f"Stored Values in Pages: {[page.read(record_number) for page in stored_values]}")
+    assert result, "Insert should return True"
+    assert 1 in table.page_directory, "Inserted RID should exist in page directory"
 
-    # Assertions
-    assert stored_values[0].read(record_number) == 0, "Indirection mismatch"
-    assert stored_values[1].read(record_number) == 0, "RID mismatch"
-    assert isinstance(stored_values[2].read(record_number), int), "Timestamp missing or invalid"
-    assert stored_values[3].read(record_number) == 0, "Schema encoding mismatch"
-    assert stored_values[4].read(record_number) == 1, "Primary key mismatch"
-    assert stored_values[5].read(record_number) == 10, "Column 1 mismatch"
-    assert stored_values[6].read(record_number) == 20, "Column 2 mismatch"
-    assert stored_values[7].read(record_number) == 30, "Column 3 mismatch"
-    assert stored_values[8].read(record_number) == 40, "Column 4 mismatch"
+test_insert_basic()
+
 
 def test_insert_multiple():
     from lstore.db import Database
     from lstore.query import Query
 
     db = Database()
-    table = db.create_table("Students", 5, 0)
+    table = db.create_table("Students", 5, 0)  # 5 columns, column 0 as primary key
     query = Query(table)
 
     # Insert multiple records
-    query.insert(1, 10, 20, 30, 40)
-    query.insert(2, 50, 60, 70, 80)
+    query.insert(1, 10, 20, 30, 40)  # Insert record 1
+    query.insert(2, 50, 60, 70, 80)  # Insert record 2
 
-    # Ensure both records exist
-    assert 0 in table.page_directory, "First record's RID not found"
-    assert 1 in table.page_directory, "Second record's RID not found"
+    # Ensure both records exist in the page directory
+    assert 1 in table.page_directory, "First record's RID not found"
+    assert 2 in table.page_directory, "Second record's RID not found"
 
     # Ensure primary keys are correctly stored
-    page_range_0, base_page_0, record_num_0 = table.page_directory[0]
-    page_range_1, base_page_1, record_num_1 = table.page_directory[1]
+    page_range_0, base_page_0, record_num_0 = table.page_directory[1]  # Record with RID 1
+    page_range_1, base_page_1, record_num_1 = table.page_directory[2]  # Record with RID 2
 
-    stored_values_0 = table.page_ranges[page_range_0].base_pages[base_page_0].pages
-    stored_values_1 = table.page_ranges[page_range_1].base_pages[base_page_1].pages
+    # Read stored primary key values
+    stored_values_0 = table.page_ranges[page_range_0].base_pages[base_page_0].pages[4]
+    stored_values_1 = table.page_ranges[page_range_1].base_pages[base_page_1].pages[4]
 
-    assert stored_values_0[4].read(record_num_0) == 1, "First primary key mismatch"
-    assert stored_values_1[4].read(record_num_1) == 2, "Second primary key mismatch"
+    # Check if the primary key is correctly stored in the 4th column
+    assert stored_values_0.read(record_num_0) == 1, "First primary key mismatch"
+    assert stored_values_1.read(record_num_1) == 2, "Second primary key mismatch"
+
+test_insert_multiple()
 
 
 def test_insert_column_mismatch():
@@ -74,6 +69,8 @@ def test_insert_column_mismatch():
     assert result == False, "Insert should fail due to extra columns"
 
 
+test_insert_column_mismatch()
+
 def test_insert_duplicate_primary_key():
     from lstore.db import Database
     from lstore.query import Query
@@ -90,6 +87,7 @@ def test_insert_duplicate_primary_key():
     result2 = query.insert(1, 50, 60, 70, 80)
     assert result2 == False, "Insert should fail due to duplicate primary key"
 
+test_insert_duplicate_primary_key()
 
 def test_insert_page_capacity():
     from lstore.db import Database
@@ -101,12 +99,15 @@ def test_insert_page_capacity():
 
     # Fill up a page (assuming 512 records per page)
     for i in range(512):
-        result = query.insert(i, 10, 20, 30, 40)
-        assert result == True, f"Insert failed at RID {i}"
+        result = query.insert(i + 1, 10, 20, 30, 40)  # Insert starting from RID 1 to 512
+        assert result == True, f"Insert failed at RID {i + 1}"
 
     # Insert one more (should go into a new page)
     result = query.insert(513, 50, 60, 70, 80)
     assert result == True, "Insert failed when starting a new page"
+
+
+test_insert_page_capacity()
 
 def test_insert_metadata():
     from lstore.db import Database
@@ -121,7 +122,7 @@ def test_insert_metadata():
     query.insert(1, 10, 20, 30, 40)
 
     # Step 3: Retrieve metadata and column data
-    rid = 0  # First record's RID
+    rid = 1  # First record's RID (adjusted from 0 to 1 for proper indexing)
     page_range, base_page, record_number = table.page_directory[rid]
     stored_values = table.page_ranges[page_range].base_pages[base_page].pages
 
@@ -137,3 +138,6 @@ def test_insert_metadata():
     assert stored_values[6].read(record_number) == 20, "Column 2 mismatch"
     assert stored_values[7].read(record_number) == 30, "Column 3 mismatch"
     assert stored_values[8].read(record_number) == 40, "Column 4 mismatch"
+
+
+test_insert_metadata()

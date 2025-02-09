@@ -14,8 +14,8 @@ class Query:
     """
     def __init__(self, table):
         self.table = table
-        self.rid_counter = 0 # counter to keep track of the number of records in the table
-        pass
+        self.rid_counter = 1 # counter to keep track of the number of records in the table
+        
 
     
     """
@@ -30,27 +30,23 @@ class Query:
         # TODO: update page directory
         pass
     
-    def make_RID(range, basePage, record):
-        return((range*8192)+(basePage*16)+(record))
-
     def get_vals(self, rid):
-        page_range = rid // 8192
-        base_page = rid % 8192 // 512
-        record = ((rid % 8192) % 512)
-        return page_range, base_page, record 
+        if rid in self.table.page_directory:
+            return self.table.page_directory[rid]
+        return None  # Handle missing RID properly
+
     """
     # Insert a record with specified columns
     # Return True upon succesful insertion
     # Returns False if insert fails for whatever reason
     """
     def insert(self, *columns):
-        #TODO: should metadata be generated here or in table.py?
-
-        # Validate column count
+        # Validate column count and prevent insertion if column count does not match
         if len(columns) != self.table.num_columns:
-            return False  # Prevent insertion if column count is wrong
+            return False  
 
         primary_key = columns[self.table.key]  # Get primary key value
+
         # Check if primary key already exists
         for rid, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
             stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[4].read(record_num)
@@ -60,29 +56,43 @@ class Query:
         # Generate metadata
         rid = self.rid_counter
         self.rid_counter += 1
-        schema_encoding = 0 
+        schema_encoding = int('0' * self.table.num_columns, 2) 
         timestamp = int(time())  # Store current timestamp
         indirection = 0 # initially set to 0
         
         # Convert into a full record format
-        record = [indirection, rid, timestamp, schema_encoding, primary_key] + list(columns[1:])
+        record = [indirection, rid, timestamp, schema_encoding] + list(columns)
 
-        # Find available page to write to
-        # Iterate through page_range to find the right range
-        page_range_number, base_page_number, record_number = self.get_vals(rid)
+        # Find available location to write to
+        page_range_number, base_page_number, record_number = None, None, None
         
-        # Ensure page range exists
-        while len(self.table.page_ranges) <= page_range_number:
-         self.table.page_ranges.append(pageRange())
+        # Iterate over page ranges to find a base page with capacity
+        for pr_num, page_range in enumerate(self.table.page_ranges):
+            for bp_num, base_page in enumerate(page_range.base_pages):
+                print(f"Checking capacity for Page Range {pr_num}, Base Page {bp_num}: {base_page.has_capacity()}")
+                if base_page.has_capacity():
+                    page_range_number, base_page_number = pr_num, bp_num
+                    record_number = base_page.pages[0].num_records  # Use next available slot
+                    break
+            if page_range_number is not None:
+                break
 
-        # Ensure base page exists in the page range
-        page_range = self.table.page_ranges[page_range_number]
-        while len(page_range.base_pages) <= base_page_number:
-            page_range.base_pages.append(PageGroup())
 
-        # Now it's safe to write
-        if page_range.base_pages[base_page_number].write(*record, offset_number=record_number) == False:
-            return False
+         # If no available space is found, create a new base page
+        if page_range_number is None:
+            page_range_number = len(self.table.page_ranges)
+            new_page_range = pageRange()
+            self.table.page_ranges.append(new_page_range)
+            base_page_number = 0
+            record_number = 0  # First slot in the new page
+
+            page_range = new_page_range  
+        else:
+            page_range = self.table.page_ranges[page_range_number]
+
+        # Write the record
+        if not page_range.base_pages[base_page_number].write(*record, record_number=record_number):
+            return False  # Return False if writing fails
 
         #update page directory for hash table
         self.table.page_directory[rid] = (page_range_number, base_page_number, record_number)

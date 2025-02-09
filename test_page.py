@@ -11,6 +11,8 @@ def test_page_write_read():
     
     assert value == 42, "Page read/write mismatch"
 
+test_page_write_read()
+
 def test_page_capacity():
     from lstore.page import Page
 
@@ -22,3 +24,5 @@ def test_page_capacity():
     
     # Should return False since the page is full
     assert page.has_capacity() == False, "Page capacity check failed"
+
+test_page_capacity()
