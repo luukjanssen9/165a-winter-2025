@@ -14,10 +14,10 @@ class Page:
             return True
         return False
 
-    def write(self, value):
+    def write(self, value, record_number):
         if self.has_capacity():
-            offset = self.num_records * VALUE_SIZE
-            self.data[offset:offset + VALUE_SIZE] = value.to_bytes(VALUE_SIZE, byteorder='little')
+            offset_number = record_number * VALUE_SIZE
+            self.data[offset_number:offset_number + VALUE_SIZE] = value.to_bytes(VALUE_SIZE, byteorder='little')
             self.num_records += 1
         else:
             print("error: page is full")  
@@ -42,19 +42,24 @@ class PageGroup():
                 return True
         return False
 
-    def write(self, *columns):
+    def write(self, *record, offset_number):
         # check if the number of columns is equal to the number of pages
-        if len(columns) != len(self.pages):
+        if len(record) != len(self.pages):
             print("error: column count mismatch")
-            return
+            return False
+        # If the BasePage is empty, create a new page for each column
+        if len(self.pages) == 0:
+            for i in range(len(record)):
+                self.pages.append(Page())
         # write each column to the corresponding page
-        for page, value in zip(self.pages, columns):
-            if page.has_capacity():
-                page.write(value)
-            else:
+        for page, value in zip(self.pages, record):
+            # we don't need to check if the page has capacity here because the modulo should ensure this
+            # if page.has_capacity():
+            page.write(value, offset_number)
+            #else:
                 # might have to change something here if the pages are full, i'm not sure
-                print("error: no capacity in one of the pages")
-                return
+                # print("error: no capacity in one of the pages")
+            return True
 
 # PAGE RANGE CLASS
 class pageRange():
@@ -63,7 +68,8 @@ class pageRange():
         # contains an array of PageGroup (tail pages)
         self.base_pages = []
         self.tail_pages = []
-        pass
+        for i in range(PAGE_RANGE_SIZE):
+            self.base_pages.append(PageGroup())
     
     def has_capacity(self):
         return len(self.base_pages) < PAGE_RANGE_SIZE

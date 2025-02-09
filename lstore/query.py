@@ -30,7 +30,14 @@ class Query:
         # TODO: update page directory
         pass
     
-    
+    def make_RID(range, basePage, record):
+        return((range*8192)+(basePage*16)+(record))
+
+    def get_vals(rid):
+        page_range = rid // 8192
+        base_page = rid % 8192 // 512
+        record = ((rid % 8192) % 512)
+        return page_range, base_page, record 
     """
     # Insert a record with specified columns
     # Return True upon succesful insertion
@@ -43,32 +50,25 @@ class Query:
         self.rid_counter += 1
         schema_encoding = '0' * self.table.num_columns  # No updates yet
         timestamp = int(time())  # Store current timestamp
-        indirection = rid  # Initially points to itself
+        indirection = None # initially set to None
         
         # Convert into a full record format
-        record = [indirection, rid, timestamp, schema_encoding] + list(columns)
+        record = [rid, indirection, schema_encoding, timestamp] + list(columns)
 
         # Find available page to write to
         # Iterate through page_range to find the right range
-        for page_range in self.table.page_ranges:
-            # Iterate through Base pages to find one with capacity
-            for base_page in page_range.base_pages:
-                if base_page.has_capacity():
-                    #TODO: write record
-                    # writing logic is not fully correct yet
-                    base_page.write(*record)
+        page_range_number, base_page_number, record_number = self.get_vals(rid)
         
-        #if no page has capacity, create a new page
-        new_page_range = pageRange()
-        new_base_page = PageGroup()
-        
-            
-        #TODO: update page directory
-        # RID - > {Page_range#, Base_page#, index#}       
+        # Write to the page
+        if self.table.page_ranges[page_range_number].base_pages[base_page_number].write(record, record_number)==False:
+            return False
+           
+        #update page directory for hash table
+        self.table.page_directory[rid] = (page_range_number, base_page_number, record_number)
         
 
         #TODO: update index
-        pass
+        return True
    
     
     """
