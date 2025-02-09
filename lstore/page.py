@@ -34,10 +34,11 @@ class Page:
 
 # BASE AND TAIL PAGE CLASS
 class PageGroup():
-    def __init__(self):
+    def __init__(self, num_columns):
         self.pages = []
-        
-    # contains an array of Pages
+        # Initialize pages for each column upfront
+        for _ in range(num_columns+4):
+            self.pages.append(Page())
 
     def has_capacity(self):
         # If there are no pages, we assume capacity for a new page
@@ -45,7 +46,7 @@ class PageGroup():
             return True
         
         for page in self.pages:
-            if page.has_capacity() is True:
+            if page.has_capacity():
                 return True
         return False
 
@@ -54,33 +55,25 @@ class PageGroup():
             print("error: No space in page group")
             return False
         # Ensure the number of pages matches the number of columns
-        while len(self.pages) < len(record):
-            self.pages.append(Page())  # Dynamically add pages as needed
-       
-        # write each column to the corresponding page
         for page, value in zip(self.pages, record):
-            # we don't need to check if the page has capacity here because the modulo should ensure this
-            # if page.has_capacity():
             page.write(value, record_number)
-            #else:
-                # might have to change something here if the pages are full, i'm not sure
-                # print("error: no capacity in one of the pages")
         return True
 
 # PAGE RANGE CLASS
 class pageRange():
-    def __init__(self):
+    def __init__(self, num_columns):
         # contains an array of PageGroup (base pages)
         # contains an array of PageGroup (tail pages)
         self.base_pages = []
         self.tail_pages = []
         for i in range(PAGE_RANGE_SIZE):
-            self.base_pages.append(PageGroup())
+            self.base_pages.append(PageGroup(num_columns))
     
     def has_capacity(self):
         for base_page in self.base_pages:
             if base_page.has_capacity():
                 return True
         return False
+
 
     

@@ -77,13 +77,13 @@ class Query:
             if page_range_number is not None:
                 break
 
-
-         # If no available space is found, create a new base page
+        # If no available space is found, create a new page range
+        # Since base pages are created upon page range initialization, we only need to create a new page range
         if page_range_number is None:
             page_range_number = len(self.table.page_ranges)
-            new_page_range = pageRange()
+            new_page_range = pageRange(num_columns=self.table.num_columns)  # Create a new page range
             self.table.page_ranges.append(new_page_range)
-            base_page_number = 0
+            base_page_number = 0 # First base page in the new page range
             record_number = 0  # First slot in the new page
 
             page_range = new_page_range  
@@ -92,13 +92,14 @@ class Query:
 
         # Write the record
         if not page_range.base_pages[base_page_number].write(*record, record_number=record_number):
-            return False  # Return False if writing fails
+            return False  
 
-        #update page directory for hash table
+        # Update page directory for hash table
         self.table.page_directory[rid] = (page_range_number, base_page_number, record_number)
-         # Print debug statement after writing
-        #TODO: update index
+
+        # TODO: Implement indexing
         return True
+
    
     
     """
