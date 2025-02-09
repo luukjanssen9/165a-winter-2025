@@ -1,6 +1,8 @@
 from lstore.table import Table, Record
 from lstore.index import Index
 from lstore.page import Page
+from time import time
+from lstore.page import PageGroup, pageRange
 
 
 class Query:
@@ -12,6 +14,7 @@ class Query:
     """
     def __init__(self, table):
         self.table = table
+        self.rid_counter = 0 # counter to keep track of the number of records in the table
         pass
 
     
@@ -34,36 +37,39 @@ class Query:
     # Returns False if insert fails for whatever reason
     """
     def insert(self, *columns):
-        # this will change in updating 
-        schema_encoding = '0' * self.table.num_columns
+        #TODO: should metadata be generated here or in table.py?
+        # Generate metadata
+        rid = self.rid_counter
+        self.rid_counter += 1
+        schema_encoding = '0' * self.table.num_columns  # No updates yet
+        timestamp = int(time())  # Store current timestamp
+        indirection = rid  # Initially points to itself
         
-        #TODO: find an available page or create a new one for each column
-        for i in range(0, self.num_columns):
-            page = self.__findAvailablePageOrCreateNewOne(i)
-            #TODO: write value to page
-            page.write(columns[i])
+        # Convert into a full record format
+        record = [indirection, rid, timestamp, schema_encoding] + list(columns)
+
+        # Find available page to write to
+        # Iterate through page_range to find the right range
+        for page_range in self.table.page_ranges:
+            # Iterate through Base pages to find one with capacity
+            for base_page in page_range.base_pages:
+                if base_page.has_capacity():
+                    #TODO: write record
+                    # writing logic is not fully correct yet
+                    base_page.write(*record)
+        
+        #if no page has capacity, create a new page
+        new_page_range = pageRange()
+        new_base_page = PageGroup()
+        
             
         #TODO: update page directory
-        # this means that if we give the rid to the page directory then it should be able to return all the pages for each individual column?
-        # RID - > {page1, page2, page3, page4, etc.}       
+        # RID - > {Page_range#, Base_page#, index#}       
         
 
         #TODO: update index
         pass
-
-    def __findAvailablePageOrCreateNewOne(self, i):
-        #TODO: find an available page or create a new one
-        # pages are stored in self.page_range
-
-        # loop through the page range for the given column
-        for page in self.page_range[i]: #maybe not indexed correctly?
-            if page.hasCapacity():
-                return page
-
-        # if there are no pages, create a new page
-        page = Page()
-        return page
-        
+   
     
     """
     # Read matching record with specified search key
