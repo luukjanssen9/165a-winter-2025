@@ -25,10 +25,19 @@ class Query:
     # Return False if record doesn't exist or is locked due to 2PL
     """
     def delete(self, primary_key):
-        # TODO: delete record from page
+        # TODO: set rid to specific value (0) to indicate that the record is deleted
+        # loop through all records
+        for page_range in self.table.page_ranges:
+            for base_page in page_range.base_pages:
+                for record_number in range(0, base_page.pages.num_records): 
+                    # check if the record primary key is the same as the one we want to delete
+                    if base_page.page[4].read(record_number) == primary_key: #5th column is the primary key
+                        base_page.page[0].write(0, record_number) # set rid to 0
+                        # TODO: set rid of tail pages to 0
 
-        # TODO: update page directory
-        pass
+                        return True
+        # if we reach here, the record does not exist
+        return False
     
     def make_RID(range, basePage, record):
         return((range*8192)+(basePage*16)+(record))
