@@ -112,7 +112,42 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
     def select(self, search_key, search_key_index, projected_columns_index):
-        pass
+        records = []
+
+        # Find the RID using the Primary Key
+        rid = None
+        for rid_key, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
+            stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[4].read(record_num)  # Primary Key Column
+            if stored_primary_key == search_key:  # Primary Key matches
+                rid = rid_key
+                break
+
+        if rid is None:
+            return False  # Record with given Primary Key not found
+
+        page_range_num, base_page_num, record_num = self.table.page_directory[rid]
+
+        # Get Base Page and Indirection Column
+        base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
+
+        indirection_value = base_page.pages[0].read(record_num)  # Indirection column
+
+         # Determine which version to return (Tail Page or Base Page)
+        if indirection_value == 0:  # No updates, return Base Page version
+            stored_values = [base_page.pages[i + 4].read(record_num) for i in range(self.table.num_columns)]
+        else:  # Follow Indirection to Tail Page
+            tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[indirection_value]
+            tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
+            stored_values = [tail_page.pages[i + 4].read(tail_record_num) for i in range(self.table.num_columns)]
+
+        # Apply Column Projection (Filter Only Requested Columns)
+        projected_values = [stored_values[i] if projected_columns_index[i] else None for i in range(self.table.num_columns)]
+
+        # Convert result to a Record object
+        record_obj = Record(search_key, search_key, projected_values)  # Assuming Record takes (RID, key, values)
+        records.append(record_obj)
+
+        return records
 
     
     """
