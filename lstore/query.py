@@ -200,8 +200,77 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
     def select_version(self, search_key, search_key_index, projected_columns_index, relative_version):
-        pass
+        records = []
+        
+        # If searching by primary key, use page directory
+        if search_key_index == self.table.key:
+            rid = None
+            for rid_key, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
+                stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[4].read(record_num)
+                if stored_primary_key == search_key:
+                    rid = rid_key
+                    break
 
+            if rid is None:
+                return False  #Record with given Primary Key not found
+
+            # Locate base record
+            page_range_num, base_page_num, record_num = self.table.page_directory[rid]
+            base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
+
+        else:
+            # If searching by **non-primary key**, perform full table scan
+            rid = None
+            for rid_key, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
+                stored_value = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[search_key_index + 5].read(record_num)
+                if stored_value == search_key:
+                    rid = rid_key
+                    break
+
+            if rid is None:
+                return False  # No record found
+
+            # Locate base record
+            page_range_num, base_page_num, record_num = self.table.page_directory[rid]
+            base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
+
+        # Traverse Tail Pages for the Correct Version
+        current_rid = base_page.pages[0].read(record_num)  # Read indirection column
+        versions = [(base_page, record_num)]
+
+        while current_rid != 0 and current_rid in self.table.page_directory:
+            tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
+            tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
+            versions.append((tail_page, tail_record_num))
+            current_rid = tail_page.pages[0].read(tail_record_num)
+
+        # Retrieve the Correct Version
+        if relative_version == 0 or len(versions) == 0:
+        #     # Return the latest version (same as select)
+            version_page, version_record_num = base_page, record_num
+
+        elif relative_version >= len(versions):  
+            return False  # Requested version does not exist
+        else:
+            # Retrieve the specified past version
+            version_page, version_record_num = versions[relative_version - 1]
+
+        # Read the Selected Record**
+        stored_values = [version_page.pages[i + 5].read(version_record_num) for i in range(self.table.num_columns - 1)]
+
+        # Ensure the Primary Key is Included**
+        stored_primary_key = base_page.pages[4].read(record_num)  
+
+        # Apply Column Projection
+        projected_values = [stored_primary_key] + [
+            stored_values[i] if projected_columns_index[i + 1] else None for i in range(self.table.num_columns - 1)
+        ]
+
+        # Convert to Record Object
+        record_obj = Record(search_key, search_key, projected_values)
+        records.append(record_obj)
+
+        return records if records else False
     
     """
     # Update a record with specified key and columns
@@ -210,7 +279,6 @@ class Query:
     """
     def update(self, primary_key, *columns):
         pass
-
     
     """
     :param start_range: int         # Start of the key range to aggregate 
