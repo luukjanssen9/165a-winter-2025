@@ -25,10 +25,19 @@ class Query:
     # Return False if record doesn't exist or is locked due to 2PL
     """
     def delete(self, primary_key):
-        # TODO: delete record from page
-
-        # TODO: update page directory
-        pass
+        # TODO: set rid to specific value (0) to indicate that the record is deleted
+        # loop through all records
+        for page_range in self.table.page_ranges:
+            for base_page in page_range.base_pages:
+                for record_number in range(0, base_page.pages.num_records): 
+                    # check if the record primary key is the same as the one we want to delete
+                    if base_page.page[4].read(record_number) == primary_key: #5th column is the primary key
+                        base_page.page[0].write(0, record_number) # set rid to 0
+                        # TODO: set rid of tail pages to 0
+                        # loop through all tail pages
+                        return True
+        # if we reach here, the record does not exist
+        return False
     
     def get_vals(self, rid):
         if rid in self.table.page_directory:
@@ -112,6 +121,7 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
     def select(self, search_key, search_key_index, projected_columns_index):
+        # TODO: do we use search_key_index?
         records = []
 
         # Find the RID using the Primary Key
@@ -132,6 +142,7 @@ class Query:
 
         indirection_value = base_page.pages[0].read(record_num)  # Indirection column
 
+        # TODO: loop through tail pages instead of just one tail page
          # Determine which version to return (Tail Page or Base Page)
         if indirection_value == 0:  # No updates, return Base Page version
             stored_values = [base_page.pages[i + 4].read(record_num) for i in range(self.table.num_columns)]
