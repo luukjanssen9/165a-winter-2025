@@ -23,6 +23,9 @@ class Query:
     # Return False if record doesn't exist or is locked due to 2PL
     """
     def delete(self, primary_key):
+
+        # print(f"deleting primary key #{primary_key}")
+
         # loop through all records to find the correct one
         for page_range in self.table.page_ranges:
             for base_page in page_range.base_pages:
@@ -37,8 +40,10 @@ class Query:
                             
                             # Only delete the base page's RID after copying it, as it is needed to delete tail page records
                             # it seems like we need to delete the primary key not the RID, as the key is used when selecting.
-                            # base_page.pages[config.RID_COLUMN].write(0, record_number) # set base page RID to 0
-                            base_page.pages[config.PRIMARY_KEY_COLUMN].write(0, record_number) # set base page Primary Key to 0
+                            base_page.pages[config.RID_COLUMN].write(0, record_number) # set base page RID to 0
+                            # base_page.pages[config.PRIMARY_KEY_COLUMN].write(0, record_number) # set base page Primary Key to 0
+                            
+                            # print(f"new RID is {base_page.pages[config.RID_COLUMN].read(record_number)}")
 
                             while current_rid != 0 and current_rid in self.table.page_directory:
                                 # use the RID to get the next tail page and record
@@ -47,10 +52,10 @@ class Query:
 
                                 # if we want to delete all tail page records along the way.
                                 # otherwise move the next line to outside the while loop, so that only the last instance is removed
-                                # tail_page.pages[config.RID_COLUMN].write(0, tail_record_num)
+                                tail_page.pages[config.RID_COLUMN].write(0, tail_record_num)
 
                                 # same as above, set primary key to 0, not RID
-                                tail_page.pages[config.PRIMARY_KEY_COLUMN].write(0, tail_record_num)
+                                # tail_page.pages[config.PRIMARY_KEY_COLUMN].write(0, tail_record_num)
 
                                 current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)  # Move to the next older version
                             
@@ -157,7 +162,13 @@ class Query:
             rid = None
             for rid_key, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
                 stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[4].read(record_num)
-                if stored_primary_key == search_key:
+                
+                # gets the RID
+                get_RID = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[config.RID_COLUMN].read(record_num)
+                # print(f"rid is {get_RID}")
+
+                # only lets it through if the RID wasnt deleted
+                if ((stored_primary_key == search_key) and (get_RID!=0)):
                     rid = rid_key
                     break
 
