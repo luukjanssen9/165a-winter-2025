@@ -306,7 +306,54 @@ class Query:
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
     def update(self, primary_key, *columns):
-        pass
+        rid = None #set to non to check for matching
+        for rid_key, (page_range_num, base_page_num, record_num) in self.table.page_directory.items(): #searcing directory to find record
+            stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[config.PRIMARY_KEY_COLUMN].read(record_num)
+            if stored_primary_key == primary_key: #if matching found fix rid
+                rid = rid_key
+                break
+    
+        if rid is None: #so update failes but need to do more error handling maybe???
+            return False  
+    
+        # base page- ok so rid found- getting page details for that
+        page_range_num, base_page_num, record_num = self.table.page_directory[rid]
+        base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
+    
+        # recent RID from indirection column
+        current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_num)
+        latest_rid = rid if current_rid == 0 or current_rid is None else current_rid #excisting rid if indirection not valid
+    
+        # new RID for the updated version
+        new_rid = self.rid_counter
+        self.rid_counter += 1
+    
+        # tail page- check space first- then if full add new tail page- idk if redu
+        page_range = self.table.page_ranges[page_range_num]
+        if not page_range.tail_pages or page_range.tail_pages[-1].pages[0].is_full():
+            page_range.tail_pages.append(pageRange(num_columns=self.table.num_columns))  
+
+        #last tail page and the slot in that page for the new record
+        tail_page = page_range.tail_pages[-1]
+        tail_record_num = tail_page.pages[0].num_records
+        
+        # here need something that saves? updated values wjhile keeping the unmodified
+        #if columns[i] is None else columns[i]
+            #for i in range(self.table.num_columns)
+        
+    
+        # finally insert updated values into the Tail Page
+        tail_page.pages[config.RID_COLUMN].insert(new_rid)
+        tail_page.pages[config.INDIRECTION_COLUMN].insert(None) 
+        for i in range(self.table.num_columns): #update the values users give?
+            tail_page.pages[i + config.USER_COLUMN_START].insert(updated_values[i])
+    
+        # Update indirection in BP to point to the new version
+        base_page.pages[config.INDIRECTION_COLUMN].write(new_rid, record_num)
+    
+    
+        return True 
+        #if false then what
     
     """
     :param start_range: int         # Start of the key range to aggregate 
