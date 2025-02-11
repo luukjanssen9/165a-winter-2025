@@ -1,2 +1,3 @@
 ./lstore/__pycache__
+*pycache*
 *.pyc
