@@ -25,17 +25,43 @@ class Query:
     # Return False if record doesn't exist or is locked due to 2PL
     """
     def delete(self, primary_key):
-        # TODO: set rid to specific value (0) to indicate that the record is deleted
+        # TODO: set RID to specific value (0) to indicate that the record is deleted
         # loop through all records
         for page_range in self.table.page_ranges:
             for base_page in page_range.base_pages:
                 for record_number in range(0, base_page.pages.num_records): 
+                    
                     # check if the record primary key is the same as the one we want to delete
-                    if base_page.page[4].read(record_number) == primary_key: #5th column is the primary key
-                        base_page.page[0].write(0, record_number) # set rid to 0
-                        # TODO: set rid of tail pages to 0
-                        # loop through all tail pages
+                    if base_page.pages[4].read(record_number) == primary_key: #5th column is the primary key
+                        
+                        # Follow indirection pointer to get the latest tail page version
+                        current_rid = base_page.pages[0].read(record_number) 
+                        
+                        # Only delete the base page's RID after copying it for deleting tail page records
+                        base_page.pages[0].write(0, record_number) # set base page RID to 0
+
+                        while current_rid != 0 and current_rid in self.table.page_directory:
+                            # use the RID to get the next tail page and record
+                            tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
+                            tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
+
+                            # if we want to delete all tail page records along the way
+                            # otherwise move the next 2 lines to outside the while loop to only remove the last instance
+                            if tail_page.pages[4].read(tail_record_num) == primary_key:
+                                tail_page.pages[0].write(0, tail_record_num)
+
+                            current_rid = tail_page.pages[0].read(tail_record_num)  # Move to the next older version
+                        
+                        # successfully deleted
                         return True
+                        
+            # very inefficient, do not use unless absolutely necessary
+            # for tail_page in page_range.tail_pages:
+            #     for record_number in range(0, tail_page.pages.num_records):
+            #         if tail_page.page[4].read(record_number) == primary_key: #5th column is the primary key
+            #             tail_page.page[0].write(0, record_number) # set rid to 0
+
+        
         # if we reach here, the record does not exist
         return False
     
