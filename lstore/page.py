@@ -1,23 +1,20 @@
-ARRAY_SIZE = 4096
-VALUE_SIZE = 8
-PAGE_RANGE_SIZE = 16
-
+import config
 # PHYSICAL PAGE CLASS
 class Page:
 
     def __init__(self):
         self.num_records = 0
-        self.data = bytearray(ARRAY_SIZE)
+        self.data = bytearray(config.ARRAY_SIZE)
 
     def has_capacity(self):
-        if self.num_records < ARRAY_SIZE/VALUE_SIZE:
+        if self.num_records < config.ARRAY_SIZE/config.VALUE_SIZE:
             return True
         return False
 
     def write(self, value, record_number):
         if self.has_capacity():
-            offset_number = record_number * VALUE_SIZE
-            self.data[offset_number:offset_number + VALUE_SIZE] = value.to_bytes(VALUE_SIZE, byteorder='little')
+            offset_number = record_number * config.VALUE_SIZE
+            self.data[offset_number:offset_number + config.VALUE_SIZE] = value.to_bytes(config.VALUE_SIZE, byteorder='little')
             self.num_records += 1
             return True
         else:
@@ -29,8 +26,8 @@ class Page:
         if record_number >= self.num_records:
             print("error: invalid index")
             return None
-        offset = record_number * VALUE_SIZE
-        return int.from_bytes(self.data[offset:offset + VALUE_SIZE], byteorder='little')
+        offset = record_number * config.VALUE_SIZE
+        return int.from_bytes(self.data[offset:offset + config.VALUE_SIZE], byteorder='little')
 
 # BASE AND TAIL PAGE CLASS
 class PageGroup():
@@ -66,7 +63,7 @@ class pageRange():
         # contains an array of PageGroup (tail pages)
         self.base_pages = []
         self.tail_pages = []
-        for i in range(PAGE_RANGE_SIZE):
+        for i in range(config.PAGE_RANGE_SIZE):
             self.base_pages.append(PageGroup(num_columns))
     
     def has_capacity(self):
