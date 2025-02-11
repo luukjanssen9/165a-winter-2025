@@ -169,19 +169,19 @@ class Query:
             base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
 
             # Follow indirection pointer to get the latest version
-            current_rid = base_page.pages[0].read(record_num) 
+            current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_num) 
             latest_version = (base_page, record_num)
 
             while current_rid != 0 and current_rid in self.table.page_directory:
                 tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
                 tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
                 latest_version = (tail_page, tail_record_num)  # Update latest version
-                current_rid = tail_page.pages[0].read(tail_record_num)  # Move to the next older version
+                current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)  # Move to the next older version
 
             # Read the final/latest version of the record
             version_page, version_record_num = latest_version
             stored_values = [version_page.pages[i + 5].read(version_record_num) for i in range(self.table.num_columns - 1)]
-            stored_primary_key = base_page.pages[4].read(record_num)
+            stored_primary_key = base_page.pages[config.PRIMARY_KEY_COLUMN].read(record_num)
 
             # Apply column projection
             projected_values = [stored_primary_key] + [
@@ -202,12 +202,12 @@ class Query:
                         tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
                         tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
                         latest_version = (tail_page, tail_record_num)  # Update latest version
-                        current_rid = tail_page.pages[0].read(tail_record_num)  # Move to next older version
+                        current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)  # Move to next older version
 
                     # Read the final/latest version of the record
                     version_page, version_record_num = latest_version
                     stored_values = [version_page.pages[i + 5].read(version_record_num) for i in range(self.table.num_columns - 1)]
-                    stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[4].read(record_num)
+                    stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[config.PRIMARY_KEY_COLUMN].read(record_num)
 
                     projected_values = [stored_primary_key] + [
                         stored_values[i] if projected_columns_index[i + 1] else None for i in range(self.table.num_columns - 1)
@@ -263,14 +263,14 @@ class Query:
             base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
 
         # Traverse Tail Pages for the Correct Version
-        current_rid = base_page.pages[0].read(record_num)  # Read indirection column
+        current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_num)  # Read indirection column
         versions = [(base_page, record_num)]
 
         while current_rid != 0 and current_rid in self.table.page_directory:
             tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
             tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
             versions.append((tail_page, tail_record_num))
-            current_rid = tail_page.pages[0].read(tail_record_num)
+            current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)
 
         # Retrieve the Correct Version
         if relative_version == 0 or len(versions) == 0:
@@ -287,7 +287,7 @@ class Query:
         stored_values = [version_page.pages[i + 5].read(version_record_num) for i in range(self.table.num_columns - 1)]
 
         # Ensure the Primary Key is Included**
-        stored_primary_key = base_page.pages[4].read(record_num)  
+        stored_primary_key = base_page.pages[config.PRIMARY_KEY_COLUMN].read(record_num)  
 
         # Apply Column Projection
         projected_values = [stored_primary_key] + [
