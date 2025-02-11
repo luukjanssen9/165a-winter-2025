@@ -3,7 +3,7 @@ from lstore.index import Index
 from lstore.page import Page
 from time import time
 from lstore.page import PageGroup, pageRange
-import config
+from lstore import config
 
 class Query:
     """
@@ -15,8 +15,6 @@ class Query:
     def __init__(self, table):
         self.table = table
         self.rid_counter = 1 # counter to keep track of the number of records in the table
-        
-
     
     """
     # internal Method
@@ -28,40 +26,46 @@ class Query:
         # loop through all records to find the correct one
         for page_range in self.table.page_ranges:
             for base_page in page_range.base_pages:
-                for record_number in range(0, base_page.pages.num_records): 
-                    
-                    # check if the record primary key is the same as the one we want to delete
-                    if base_page.pages[config.PRIMARY_KEY_COLUMN].read(record_number) == primary_key: #5th column is the primary key
+                for page in range(0, len(base_page.pages)):
+                    for record_number in range(0, base_page.pages[page].num_records): 
                         
-                        # Follow indirection pointer to get the latest tail page version
-                        current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_number) 
-                        
-                        # Only delete the base page's RID after copying it, as it is needed to delete tail page records
-                        base_page.pages[config.RID_COLUMN].write(0, record_number) # set base page RID to 0
+                        # check if the record primary key is the same as the one we want to delete
+                        if base_page.pages[config.PRIMARY_KEY_COLUMN].read(record_number) == primary_key: #5th column is the primary key
+                            
+                            # Follow indirection pointer to get the latest tail page version
+                            current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_number) 
+                            
+                            # Only delete the base page's RID after copying it, as it is needed to delete tail page records
+                            # it seems like we need to delete the primary key not the RID, as the key is used when selecting.
+                            # base_page.pages[config.RID_COLUMN].write(0, record_number) # set base page RID to 0
+                            base_page.pages[config.PRIMARY_KEY_COLUMN].write(0, record_number) # set base page Primary Key to 0
 
-                        while current_rid != 0 and current_rid in self.table.page_directory:
-                            # use the RID to get the next tail page and record
-                            tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
-                            tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
+                            while current_rid != 0 and current_rid in self.table.page_directory:
+                                # use the RID to get the next tail page and record
+                                tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
+                                tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
 
-                            # if we want to delete all tail page records along the way.
-                            # otherwise move the next line to outside the while loop, so that only the last instance is removed
-                            tail_page.pages[config.RID_COLUMN].write(0, tail_record_num)
+                                # if we want to delete all tail page records along the way.
+                                # otherwise move the next line to outside the while loop, so that only the last instance is removed
+                                # tail_page.pages[config.RID_COLUMN].write(0, tail_record_num)
 
-                            current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)  # Move to the next older version
-                        
-                        # successfully deleted
-                        return True
-                        
-            # very inefficient, do not use unless absolutely necessary
-            # for tail_page in page_range.tail_pages:
-            #     for record_number in range(0, tail_page.pages.num_records):
-            #         if tail_page.page[4].read(record_number) == primary_key: #5th column is the primary key
-            #             tail_page.page[0].write(0, record_number) # set rid to 0
+                                # same as above, set primary key to 0, not RID
+                                tail_page.pages[config.PRIMARY_KEY_COLUMN].write(0, tail_record_num)
 
-        
-        # if we reach here, the record does not exist
-        return False
+                                current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)  # Move to the next older version
+                            
+                            # successfully deleted
+                            return True
+                            
+                # very inefficient, do not use unless absolutely necessary
+                # for tail_page in page_range.tail_pages:
+                #     for record_number in range(0, tail_page.pages.num_records):
+                #         if tail_page.page[4].read(record_number) == primary_key: #5th column is the primary key
+                #             tail_page.page[0].write(0, record_number) # set rid to 0
+
+            
+            # if we reach here, the record does not exist
+            return False
     
     def get_vals(self, rid):
         if rid in self.table.page_directory:
