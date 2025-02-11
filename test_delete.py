@@ -37,10 +37,12 @@ def test_delete():
     # print(f"key: {result1[0].key}")
     # print(f"cols: {result1[0].columns}")
     
+    assert result2 is False, "Incorrect delete output"
+    # if result2==False: print(f"\npassed")
+    # else: print(f"\nfailed")
     # print(f"rid: {result2[0].rid}")
     # print(f"key: {result2[0].key}")
     # print(f"cols: {result2[0].columns}")
-    assert result2 is False, "Incorrect delete output"
 
     print("Delete test passed!")
 
