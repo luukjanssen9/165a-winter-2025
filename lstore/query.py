@@ -25,8 +25,7 @@ class Query:
     # Return False if record doesn't exist or is locked due to 2PL
     """
     def delete(self, primary_key):
-        # TODO: set RID to specific value (0) to indicate that the record is deleted
-        # loop through all records
+        # loop through all records to find the correct one
         for page_range in self.table.page_ranges:
             for base_page in page_range.base_pages:
                 for record_number in range(0, base_page.pages.num_records): 
@@ -37,7 +36,7 @@ class Query:
                         # Follow indirection pointer to get the latest tail page version
                         current_rid = base_page.pages[0].read(record_number) 
                         
-                        # Only delete the base page's RID after copying it for deleting tail page records
+                        # Only delete the base page's RID after copying it, as it is needed to delete tail page records
                         base_page.pages[0].write(0, record_number) # set base page RID to 0
 
                         while current_rid != 0 and current_rid in self.table.page_directory:
@@ -45,8 +44,8 @@ class Query:
                             tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
                             tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
 
-                            # if we want to delete all tail page records along the way
-                            # otherwise move the next 2 lines to outside the while loop to only remove the last instance
+                            # if we want to delete all tail page records along the way.
+                            # otherwise move the next 2 lines to outside the while loop, so that only the last instance is removed
                             if tail_page.pages[4].read(tail_record_num) == primary_key:
                                 tail_page.pages[0].write(0, tail_record_num)
 
@@ -315,8 +314,29 @@ class Query:
     # Returns False if no record exists in the given range
     """
     def sum(self, start_range, end_range, aggregate_column_index):
-        pass
+        # ensure that start range is lower than end range
+        if(start_range<end_range):
+            start_range, end_range = end_range, start_range
 
+        sum = 0
+        range_not_empty = False
+        
+        for key in range(start_range, end_range+1):
+            # same line from the increment function
+            row = self.select(key, self.table.key, [1] * self.table.num_columns)[0]
+            
+            # validate row
+            if row is False:
+                continue
+            # at least one valid row
+            range_not_empty = True
+
+            # add the cell to the sum
+            sum += row[aggregate_column_index]
+
+        if range_not_empty==False:
+            return False
+        else: return sum
     
     """
     :param start_range: int         # Start of the key range to aggregate 
