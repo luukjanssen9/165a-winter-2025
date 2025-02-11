@@ -3,7 +3,7 @@ from lstore.index import Index
 from lstore.page import Page
 from time import time
 from lstore.page import PageGroup, pageRange
-
+import config
 
 class Query:
     """
@@ -14,8 +14,8 @@ class Query:
     """
     def __init__(self, table):
         self.table = table
-        self.rid_counter = 0 # counter to keep track of the number of records in the table
-        pass
+        self.rid_counter = 1 # counter to keep track of the number of records in the table
+        
 
     
     """
@@ -25,50 +25,114 @@ class Query:
     # Return False if record doesn't exist or is locked due to 2PL
     """
     def delete(self, primary_key):
-        # TODO: delete record from page
+        # loop through all records to find the correct one
+        for page_range in self.table.page_ranges:
+            for base_page in page_range.base_pages:
+                for record_number in range(0, base_page.pages.num_records): 
+                    
+                    # check if the record primary key is the same as the one we want to delete
+                    if base_page.pages[config.PRIMARY_KEY_COLUMN].read(record_number) == primary_key: #5th column is the primary key
+                        
+                        # Follow indirection pointer to get the latest tail page version
+                        current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_number) 
+                        
+                        # Only delete the base page's RID after copying it, as it is needed to delete tail page records
+                        base_page.pages[config.RID_COLUMN].write(0, record_number) # set base page RID to 0
 
-        # TODO: update page directory
-        pass
+                        while current_rid != 0 and current_rid in self.table.page_directory:
+                            # use the RID to get the next tail page and record
+                            tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
+                            tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
+
+                            # if we want to delete all tail page records along the way.
+                            # otherwise move the next line to outside the while loop, so that only the last instance is removed
+                            tail_page.pages[config.RID_COLUMN].write(0, tail_record_num)
+
+                            current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)  # Move to the next older version
+                        
+                        # successfully deleted
+                        return True
+                        
+            # very inefficient, do not use unless absolutely necessary
+            # for tail_page in page_range.tail_pages:
+            #     for record_number in range(0, tail_page.pages.num_records):
+            #         if tail_page.page[4].read(record_number) == primary_key: #5th column is the primary key
+            #             tail_page.page[0].write(0, record_number) # set rid to 0
+
+        
+        # if we reach here, the record does not exist
+        return False
     
-    def make_RID(range, basePage, record):
-        return((range*8192)+(basePage*16)+(record))
+    def get_vals(self, rid):
+        if rid in self.table.page_directory:
+            return self.table.page_directory[rid]
+        return None  # Handle missing RID properly
 
-    def get_vals(rid):
-        page_range = rid // 8192
-        base_page = rid % 8192 // 512
-        record = ((rid % 8192) % 512)
-        return page_range, base_page, record 
     """
     # Insert a record with specified columns
     # Return True upon succesful insertion
     # Returns False if insert fails for whatever reason
     """
     def insert(self, *columns):
-        #TODO: should metadata be generated here or in table.py?
+        # Validate column count and prevent insertion if column count does not match
+        if len(columns) != self.table.num_columns:
+            return False  
+
+        primary_key = columns[self.table.key]  # Get primary key value
+
+        # Check if primary key already exists
+        for rid, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
+            stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[4].read(record_num)
+            if stored_primary_key == primary_key:
+                return False  # Prevent duplicate insertion
+        
         # Generate metadata
         rid = self.rid_counter
         self.rid_counter += 1
-        schema_encoding = '0' * self.table.num_columns  # No updates yet
+        schema_encoding = int('0' * self.table.num_columns, 2) 
         timestamp = int(time())  # Store current timestamp
-        indirection = None # initially set to None
+        indirection = 0 # initially set to 0
         
         # Convert into a full record format
-        record = [rid, indirection, schema_encoding, timestamp] + list(columns)
+        record = [indirection, rid, timestamp, schema_encoding] + list(columns)
 
-        # Find available page to write to
-        # Iterate through page_range to find the right range
-        page_range_number, base_page_number, record_number = self.get_vals(rid)
+        # Find available location to write to
+        page_range_number, base_page_number, record_number = None, None, None
         
-        # Write to the page
-        if self.table.page_ranges[page_range_number].base_pages[base_page_number].write(record, record_number)==False:
-            return False
-           
-        #update page directory for hash table
+        # Iterate over page ranges to find a base page with capacity
+        for pr_num, page_range in enumerate(self.table.page_ranges):
+            for bp_num, base_page in enumerate(page_range.base_pages):
+                # print(f"Checking capacity for Page Range {pr_num}, Base Page {bp_num}: {base_page.has_capacity()}")
+                if base_page.has_capacity():
+                    page_range_number, base_page_number = pr_num, bp_num
+                    record_number = base_page.pages[0].num_records  # Use next available slot
+                    break
+            if page_range_number is not None:
+                break
+
+        # If no available space is found, create a new page range
+        # Since base pages are created upon page range initialization, we only need to create a new page range
+        if page_range_number is None:
+            page_range_number = len(self.table.page_ranges)
+            new_page_range = pageRange(num_columns=self.table.num_columns)  # Create a new page range
+            self.table.page_ranges.append(new_page_range)
+            base_page_number = 0 # First base page in the new page range
+            record_number = 0  # First slot in the new page
+
+            page_range = new_page_range  
+        else:
+            page_range = self.table.page_ranges[page_range_number]
+
+        # Write the record
+        if not page_range.base_pages[base_page_number].write(*record, record_number=record_number):
+            return False  
+
+        # Update page directory for hash table
         self.table.page_directory[rid] = (page_range_number, base_page_number, record_number)
-        
 
-        #TODO: update index
+        # TODO: Implement indexing
         return True
+
    
     
     """
@@ -81,7 +145,72 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
     def select(self, search_key, search_key_index, projected_columns_index):
-        pass
+        # TODO: do we use search_key_index?
+        records = []
+
+        if search_key_index == self.table.key:
+            # Use page directory for fast lookup if searching by primary key
+            rid = None
+            for rid_key, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
+                stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[4].read(record_num)
+                if stored_primary_key == search_key:
+                    rid = rid_key
+                    break
+
+            if rid is None:
+                return False 
+
+            # Locate the record in the page directory using RID
+            page_range_num, base_page_num, record_num = self.table.page_directory[rid]
+            base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
+
+            # Follow indirection pointer to get the latest version
+            current_rid = base_page.pages[0].read(record_num) 
+            latest_version = (base_page, record_num)
+
+            while current_rid != 0 and current_rid in self.table.page_directory:
+                tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
+                tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
+                latest_version = (tail_page, tail_record_num)  # Update latest version
+                current_rid = tail_page.pages[0].read(tail_record_num)  # Move to the next older version
+
+            # Read the final/latest version of the record
+            version_page, version_record_num = latest_version
+            stored_values = [version_page.pages[i + 5].read(version_record_num) for i in range(self.table.num_columns - 1)]
+            stored_primary_key = base_page.pages[4].read(record_num)
+
+            # Apply column projection
+            projected_values = [stored_primary_key] + [
+                stored_values[i] if projected_columns_index[i + 1] else None for i in range(self.table.num_columns - 1)
+            ]
+            records.append(Record(search_key, search_key, projected_values))
+
+        else:
+            # Scan all records if searching by a non-primary key column
+            for rid_key, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
+                stored_value = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[search_key_index + 5].read(record_num)
+                if stored_value == search_key:
+                    # Follow the indirection chain to get the latest version
+                    current_rid = rid_key
+                    latest_version = (self.table.page_ranges[page_range_num].base_pages[base_page_num], record_num)
+
+                    while current_rid != 0 and current_rid in self.table.page_directory:
+                        tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
+                        tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
+                        latest_version = (tail_page, tail_record_num)  # Update latest version
+                        current_rid = tail_page.pages[0].read(tail_record_num)  # Move to next older version
+
+                    # Read the final/latest version of the record
+                    version_page, version_record_num = latest_version
+                    stored_values = [version_page.pages[i + 5].read(version_record_num) for i in range(self.table.num_columns - 1)]
+                    stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[4].read(record_num)
+
+                    projected_values = [stored_primary_key] + [
+                        stored_values[i] if projected_columns_index[i + 1] else None for i in range(self.table.num_columns - 1)
+                    ]
+                    records.append(Record(stored_primary_key, search_key, projected_values))
+
+        return records if records else False
 
     
     """
@@ -95,8 +224,77 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
     def select_version(self, search_key, search_key_index, projected_columns_index, relative_version):
-        pass
+        records = []
+        
+        # If searching by primary key, use page directory
+        if search_key_index == self.table.key:
+            rid = None
+            for rid_key, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
+                stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[4].read(record_num)
+                if stored_primary_key == search_key:
+                    rid = rid_key
+                    break
 
+            if rid is None:
+                return False  #Record with given Primary Key not found
+
+            # Locate base record
+            page_range_num, base_page_num, record_num = self.table.page_directory[rid]
+            base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
+
+        else:
+            # If searching by **non-primary key**, perform full table scan
+            rid = None
+            for rid_key, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
+                stored_value = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[search_key_index + 5].read(record_num)
+                if stored_value == search_key:
+                    rid = rid_key
+                    break
+
+            if rid is None:
+                return False  # No record found
+
+            # Locate base record
+            page_range_num, base_page_num, record_num = self.table.page_directory[rid]
+            base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
+
+        # Traverse Tail Pages for the Correct Version
+        current_rid = base_page.pages[0].read(record_num)  # Read indirection column
+        versions = [(base_page, record_num)]
+
+        while current_rid != 0 and current_rid in self.table.page_directory:
+            tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
+            tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
+            versions.append((tail_page, tail_record_num))
+            current_rid = tail_page.pages[0].read(tail_record_num)
+
+        # Retrieve the Correct Version
+        if relative_version == 0 or len(versions) == 0:
+        #     # Return the latest version (same as select)
+            version_page, version_record_num = base_page, record_num
+
+        elif relative_version >= len(versions):  
+            return False  # Requested version does not exist
+        else:
+            # Retrieve the specified past version
+            version_page, version_record_num = versions[relative_version - 1]
+
+        # Read the Selected Record**
+        stored_values = [version_page.pages[i + 5].read(version_record_num) for i in range(self.table.num_columns - 1)]
+
+        # Ensure the Primary Key is Included**
+        stored_primary_key = base_page.pages[4].read(record_num)  
+
+        # Apply Column Projection
+        projected_values = [stored_primary_key] + [
+            stored_values[i] if projected_columns_index[i + 1] else None for i in range(self.table.num_columns - 1)
+        ]
+
+        # Convert to Record Object
+        record_obj = Record(search_key, search_key, projected_values)
+        records.append(record_obj)
+
+        return records if records else False
     
     """
     # Update a record with specified key and columns
@@ -105,7 +303,6 @@ class Query:
     """
     def update(self, primary_key, *columns):
         pass
-
     
     """
     :param start_range: int         # Start of the key range to aggregate 
@@ -116,8 +313,29 @@ class Query:
     # Returns False if no record exists in the given range
     """
     def sum(self, start_range, end_range, aggregate_column_index):
-        pass
+        # ensure that start range is lower than end range
+        if(start_range<end_range):
+            start_range, end_range = end_range, start_range
 
+        sum = 0
+        range_not_empty = False
+        
+        for key in range(start_range, end_range+1):
+            # same line from the increment function
+            row = self.select(key, self.table.key, [1] * self.table.num_columns)[0]
+            
+            # validate row
+            if row is False:
+                continue
+            # at least one valid row
+            range_not_empty = True
+
+            # add the cell to the sum
+            sum += row[aggregate_column_index]
+
+        if range_not_empty==False:
+            return False
+        else: return sum
     
     """
     :param start_range: int         # Start of the key range to aggregate 
