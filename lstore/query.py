@@ -3,12 +3,7 @@ from lstore.index import Index
 from lstore.page import Page
 from time import time
 from lstore.page import PageGroup, pageRange
-
-INDIRECTION_COLUMN = 0
-RID_COLUMN = 1
-TIMESTAMP_COLUMN = 2
-SCHEMA_ENCODING_COLUMN = 3
-PRIMARY_KEY_COLUMN = 4
+import config
 
 class Query:
     """
@@ -36,13 +31,13 @@ class Query:
                 for record_number in range(0, base_page.pages.num_records): 
                     
                     # check if the record primary key is the same as the one we want to delete
-                    if base_page.pages[PRIMARY_KEY_COLUMN].read(record_number) == primary_key: #5th column is the primary key
+                    if base_page.pages[config.PRIMARY_KEY_COLUMN].read(record_number) == primary_key: #5th column is the primary key
                         
                         # Follow indirection pointer to get the latest tail page version
-                        current_rid = base_page.pages[INDIRECTION_COLUMN].read(record_number) 
+                        current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_number) 
                         
                         # Only delete the base page's RID after copying it, as it is needed to delete tail page records
-                        base_page.pages[RID_COLUMN].write(0, record_number) # set base page RID to 0
+                        base_page.pages[config.RID_COLUMN].write(0, record_number) # set base page RID to 0
 
                         while current_rid != 0 and current_rid in self.table.page_directory:
                             # use the RID to get the next tail page and record
@@ -51,9 +46,9 @@ class Query:
 
                             # if we want to delete all tail page records along the way.
                             # otherwise move the next line to outside the while loop, so that only the last instance is removed
-                            tail_page.pages[RID_COLUMN].write(0, tail_record_num)
+                            tail_page.pages[config.RID_COLUMN].write(0, tail_record_num)
 
-                            current_rid = tail_page.pages[INDIRECTION_COLUMN].read(tail_record_num)  # Move to the next older version
+                            current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)  # Move to the next older version
                         
                         # successfully deleted
                         return True
