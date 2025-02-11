@@ -1,4 +1,4 @@
-import config
+from lstore import config
 # PHYSICAL PAGE CLASS
 class Page:
 
