@@ -1,6 +1,8 @@
+from lstore.db import Database
+from lstore.query import Query
+
 def test_delete():
-    from lstore.db import Database
-    from lstore.query import Query
+    
 
     db = Database()
     table = db.create_table("Students", 5, 0)
