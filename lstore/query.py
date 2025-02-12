@@ -194,7 +194,7 @@ class Query:
 
             # Read the final/latest version of the record
             version_page, version_record_num = latest_version
-            stored_values = [version_page.pages[i + 4   ].read(version_record_num) for i in range(self.table.num_columns - 1)]
+            stored_values = [version_page.pages[i + 5].read(version_record_num) for i in range(self.table.num_columns - 1)]
             stored_primary_key = base_page.pages[4].read(record_num)
 
             # Apply column projection
