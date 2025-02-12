@@ -171,10 +171,10 @@ class Query:
 
             while current_rid != 0 and current_rid in self.table.page_directory:
                 if iteration_count > MAX_CHAIN_LENGTH:
-                    print("ERROR: Infinite loop detected in indirection chain in select()!")
+                    # print("ERROR: Infinite loop detected in indirection chain in select()!")
                     break
                 if current_rid in visited_rids:
-                    print("ERROR: Cycle detected in indirection chain in select()!")
+                    # print("ERROR: Cycle detected in indirection chain in select()!")
                     break
                 visited_rids.add(current_rid)
                 iteration_count += 1
@@ -313,7 +313,7 @@ class Query:
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
     def update(self, primary_key, *columns):
-        print("Starting update function")
+        # print("Starting update function")
         rid = None # set to none to check for matching
         for rid_key, (page_range_num, base_page_num, record_num) in self.table.page_directory.items(): #searcing directory to find record
             stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[config.PRIMARY_KEY_COLUMN].read(record_num)
@@ -322,11 +322,11 @@ class Query:
                 break
     
         if rid is None: # no match -> update fails
-            print("No matching record found")
+            # print("No matching record found")
             return False  
     
 
-        print("Matching record found, RID:", rid)
+        # print("Matching record found, RID:", rid)
 
         # base page- ok so rid found- getting page details for that
         page_range_num, base_page_num, record_num = self.table.page_directory[rid]
@@ -336,36 +336,36 @@ class Query:
         current_values = [base_page.pages[i + 4].read(record_num) for i in range(self.table.num_columns)]
         updated_values = [columns[i] if columns[i] is not None else current_values[i] for i in range(self.table.num_columns)]
 
-        print("Current values:", current_values)
-        print("Updated values:", updated_values)
+        # print("Current values:", current_values)
+        # print("Updated values:", updated_values)
 
         # Create a new version of the record
         new_rid = self.rid_counter
         self.rid_counter += 1
         timestamp = int(time())
         schema_encoding = int(''.join(['1' if col is not None else '0' for col in columns]), 2)
-        indirection = rid  # Point to the previous version
+        indirection = 0  # SET IT TO FUCKING 0 AAAAAAAAAAAA
 
         # Convert into a full record format
         new_record = [indirection, new_rid, timestamp, schema_encoding] + updated_values
 
-        print("New record:", new_record)
+        # print("New record:", new_record)
 
         # Find available location to write the new version
         page_range = self.table.page_ranges[page_range_num]
         if not page_range.tail_pages or not page_range.tail_pages[-1].pages[0].has_capacity():
-            print("Adding new tail page")
+            # print("Adding new tail page")
             page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))
 
         # Last tail page and the slot in that page for the new record
         # tail_page = page_range.tail_pages[-1]
         # tail_record_num = tail_page.pages[0].num_records
-        print("DEBUG: type of page_range.tail_pages[-1] =", type(page_range.tail_pages[-1]))
+        # print("DEBUG: type of page_range.tail_pages[-1] =", type(page_range.tail_pages[-1]))
 
         tail_page_group = page_range.tail_pages[-1]
         tail_record_num = tail_page_group.pages[0].num_records
 
-        print("Writing new version to tail page at record number:", tail_record_num)
+        # print("Writing new version to tail page at record number:", tail_record_num)
 
         # Write the new version
         tail_page_group.write(*new_record, record_number=tail_record_num)
@@ -375,13 +375,13 @@ class Query:
 
         # Update the indirection column of the base record to point to the new version
 
-        print(f"DEBUG: Updating base record at {record_num} with new indirection RID: {new_rid}")
-        print(f"DEBUG: Previous indirection RID: {base_page.pages[config.INDIRECTION_COLUMN].read(record_num)}")
+        # print(f"DEBUG: Updating base record at {record_num} with new indirection RID: {new_rid}")
+        # print(f"DEBUG: Previous indirection RID: {base_page.pages[config.INDIRECTION_COLUMN].read(record_num)}")
         base_page.pages[config.INDIRECTION_COLUMN].write(new_rid, record_num)
-        print(f"DEBUG: New indirection RID set: {base_page.pages[config.INDIRECTION_COLUMN].read(record_num)}")
+        # print(f"DEBUG: New indirection RID set: {base_page.pages[config.INDIRECTION_COLUMN].read(record_num)}")
 
 
-        print("Update successful")
+        # print("Update successful")
         return True
     
     """

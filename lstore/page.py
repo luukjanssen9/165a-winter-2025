@@ -23,7 +23,7 @@ class Page:
 
 
     def read(self, record_number):
-        if record_number >= self.num_records:
+        if record_number >= config.ARRAY_SIZE/config.VALUE_SIZE:
             print("error: invalid index")
             return None
         offset = record_number * config.VALUE_SIZE
