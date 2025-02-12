@@ -360,7 +360,7 @@ class Query:
 
         # Find available location to write the new version
         page_range = self.table.page_ranges[page_range_num]
-        if not page_range.tail_pages or page_range.tail_pages[-1].pages[0].has_capacity():
+        if not page_range.tail_pages or not page_range.tail_pages[-1].pages[0].has_capacity():
             print("Adding new tail page")
             page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))
 
@@ -375,9 +375,7 @@ class Query:
         print("Writing new version to tail page at record number:", tail_record_num)
 
         # Write the new version
-        for i, value in enumerate(new_record):
-            print(f"Writing value {value} to page {i} at record number {tail_record_num}")
-            tail_page_group.pages[i].write(value, tail_record_num)
+        tail_page_group.write(*new_record, record_number=tail_record_num)
 
         # Update page directory for the new version
         self.table.page_directory[new_rid] = (page_range_num, len(page_range.tail_pages) - 1, tail_record_num)
