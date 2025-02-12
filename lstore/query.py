@@ -358,7 +358,7 @@ class Query:
     """
     def sum(self, start_range, end_range, aggregate_column_index):
         # ensure that start range is lower than end range
-        if(start_range<end_range):
+        if(start_range>end_range):
             start_range, end_range = end_range, start_range
 
         sum = 0
@@ -366,8 +366,6 @@ class Query:
         
         for key in range(start_range, end_range+1):
             # same line from the increment function
-
-            # this is where the problems happen. this is the same query.select() as the increment function, idk why it doesnt work
             row = self.select(key, self.table.key, [1] * self.table.num_columns)
             
             # validate row
@@ -408,9 +406,7 @@ class Query:
         r = self.select(key, self.table.key, [1] * self.table.num_columns)
         if r is not False:
             updated_columns = [None] * self.table.num_columns
-            # print(r[0].columns)
             updated_columns[column] = r[0].columns[column] + 1
-            # print(updated_columns)
             u = self.update(key, *updated_columns)
             return u
         return False
