@@ -145,7 +145,12 @@ class Query:
             rid = None
             for rid_key, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
                 stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[4].read(record_num)
-                if stored_primary_key == search_key:
+                
+                # gets the RID
+                get_RID = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[config.RID_COLUMN].read(record_num)
+
+                # only lets it through if the RID wasnt deleted
+                if ((stored_primary_key == search_key) and (get_RID!=0)):
                     rid = rid_key
                     break
 
