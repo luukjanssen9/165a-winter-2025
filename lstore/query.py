@@ -300,7 +300,53 @@ class Query:
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
     def update(self, primary_key, *columns):
-        pass
+        
+        # try something like `cols = [1] * self.table.num_columns`
+        record = self.select(primary_key, self.table.key, [1] * self.table.num_columns)[0]
+        if record == False:
+            # record not found
+            return False
+    
+        # base page- ok so rid found- getting page details for that
+        page_range_num, base_page_num, record_num = self.table.page_directory[record]
+        base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
+    
+        # recent RID from indirection column
+        current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_num)
+        latest_rid = record if current_rid == 0 or current_rid is None else current_rid #excisting rid if indirection not valid
+    
+        # new RID for the updated version
+        new_rid = self.rid_counter
+        self.rid_counter += 1
+    
+        # tail page- check space first- then if full add new tail page- idk if redu
+        page_range = self.table.page_ranges[page_range_num]
+        if not page_range.tail_pages or page_range.tail_pages[-1].pages[0].is_full():
+            page_range.tail_pages.append(pageRange(num_columns=self.table.num_columns))  
+
+        #last tail page and the slot in that page for the new record
+        tail_page = page_range.tail_pages[-1]
+        tail_record_num = tail_page.pages[0].num_records
+        
+        # here need something that saves? updated values wjhile keeping the unmodified
+        #if columns[i] is None else columns[i]
+            #for i in range(self.table.num_columns)
+        
+    
+        # needs to create the record like in regular insert
+
+        # finally insert updated values into the Tail Page
+        tail_page.pages[config.RID_COLUMN].insert(new_rid)
+        tail_page.pages[config.INDIRECTION_COLUMN].insert(None) 
+        for i in range(self.table.num_columns): #update the values users give?
+            tail_page.pages[i + config.USER_COLUMN_START].insert(updated_values[i])
+    
+        # Update indirection in BP to point to the new version
+        base_page.pages[config.INDIRECTION_COLUMN].write(new_rid, record_num)
+    
+    
+        return True 
+        #if false then what
     
     """
     :param start_range: int         # Start of the key range to aggregate 
@@ -320,7 +366,9 @@ class Query:
         
         for key in range(start_range, end_range+1):
             # same line from the increment function
-            row = self.select(key, self.table.key, [1] * self.table.num_columns)[0]
+
+            # this is where the problems happen. this is the same query.select() as the increment function, idk why it doesnt work
+            row = self.select(key, self.table.key, [1] * self.table.num_columns)
             
             # validate row
             if row is False:
@@ -329,7 +377,7 @@ class Query:
             range_not_empty = True
 
             # add the cell to the sum
-            sum += row[aggregate_column_index]
+            sum += row[0].columns[aggregate_column_index]
 
         if range_not_empty==False:
             return False
@@ -357,10 +405,12 @@ class Query:
     # Returns False if no record matches key or if target record is locked by 2PL.
     """
     def increment(self, key, column):
-        r = self.select(key, self.table.key, [1] * self.table.num_columns)[0]
+        r = self.select(key, self.table.key, [1] * self.table.num_columns)
         if r is not False:
             updated_columns = [None] * self.table.num_columns
-            updated_columns[column] = r[column] + 1
+            # print(r[0].columns)
+            updated_columns[column] = r[0].columns[column] + 1
+            # print(updated_columns)
             u = self.update(key, *updated_columns)
             return u
         return False
