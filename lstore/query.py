@@ -329,7 +329,7 @@ class Query:
     """
     def sum(self, start_range, end_range, aggregate_column_index):
         # ensure that start range is lower than end range
-        if(start_range<end_range):
+        if(start_range > end_range):
             start_range, end_range = end_range, start_range
 
         sum = 0
