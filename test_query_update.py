@@ -34,6 +34,7 @@ def test_query_update():
 
     # Verify the record is updated
     record = query.select(2, 0, [1, 1, 1, 1, 1])[0]
+    print(record.columns)
     assert record.columns == [2, 15, 200, 35, 400], "Partial columns update verification failed"
 
     # Test updating all columns of an existing record

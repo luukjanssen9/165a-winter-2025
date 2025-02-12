@@ -159,6 +159,7 @@ class Query:
                 stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[4].read(record_num)
                 if stored_primary_key == search_key:
                     rid = rid_key
+                    print(f"\n\nin search, rid is {rid}")
                     break
 
             if rid is None:
@@ -170,7 +171,10 @@ class Query:
 
             # Follow indirection pointer to get the latest version
             current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_num) 
-            latest_version = (base_page, record_num)
+            if current_rid!=0:
+                latest_version = (base_page, record_num)
+                print(f"in search, current rid = {current_rid}")
+            else: print(f"in search, got 0 for indirection")
 
             MAX_CHAIN_LENGTH = 1000  # Prevent infinite loops
             iteration_count = 0
@@ -191,6 +195,8 @@ class Query:
                 tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
                 latest_version = (tail_page, tail_record_num)  # Update latest version
                 current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)  # Move to the next older version
+                print(f"in search, next rid: {current_rid}")
+            print(f"in search, last one, next rid is {current_rid}")
 
             # Read the final/latest version of the record
             version_page, version_record_num = latest_version
@@ -204,11 +210,13 @@ class Query:
             records.append(Record(search_key, search_key, projected_values))
 
         else:
+            print(f"in search, else ")
             # Scan all records if searching by a non-primary key column
             for rid_key, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
                 stored_value = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[search_key_index + 5].read(record_num)
                 if stored_value == search_key:
                     # Follow the indirection chain to get the latest version
+                    print(f"\nin select: rid key = {rid_key}\n")
                     current_rid = rid_key
                     latest_version = (self.table.page_ranges[page_range_num].base_pages[base_page_num], record_num)
 
@@ -217,6 +225,7 @@ class Query:
                         tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
                         latest_version = (tail_page, tail_record_num)  # Update latest version
                         current_rid = tail_page.pages[0].read(tail_record_num)  # Move to next older version
+                        print(f"in select: current rid is {current_rid}")
 
                     # Read the final/latest version of the record
                     version_page, version_record_num = latest_version
@@ -370,7 +379,7 @@ class Query:
         print("DEBUG: type of page_range.tail_pages[-1] =", type(page_range.tail_pages[-1]))
 
         tail_page_group = page_range.tail_pages[-1]
-        tail_record_num = tail_page_group.pages[0].num_records
+        tail_record_num = tail_page_group.pages[config.INDIRECTION_COLUMN].num_records
 
         print("Writing new version to tail page at record number:", tail_record_num)
 

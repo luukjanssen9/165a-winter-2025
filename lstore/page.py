@@ -26,9 +26,9 @@ class Page:
 
 
     def read(self, record_number):
-        if record_number >= self.num_records:
-            print("error: invalid index")
-            return None
+        # if record_number >= self.num_records:
+        #     print("error: invalid index")
+        #     return None
         offset = record_number * VALUE_SIZE
         return int.from_bytes(self.data[offset:offset + VALUE_SIZE], byteorder='little')
 
