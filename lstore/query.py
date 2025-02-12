@@ -375,8 +375,10 @@ class Query:
             # at least one valid row
             range_not_empty = True
 
+            val = row[0].columns[aggregate_column_index]
             # add the cell to the sum
-            sum += row[0].columns[aggregate_column_index]
+            if val != None:
+                sum += val
 
         if range_not_empty==False:
             return False
