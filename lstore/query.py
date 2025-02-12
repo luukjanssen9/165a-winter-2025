@@ -23,9 +23,6 @@ class Query:
     # Return False if record doesn't exist or is locked due to 2PL
     """
     def delete(self, primary_key):
-
-        # print(f"deleting primary key #{primary_key}")
-
         # loop through all records to find the correct one
         for page_range in self.table.page_ranges:
             for base_page in page_range.base_pages:
@@ -38,40 +35,26 @@ class Query:
                             # Follow indirection pointer to get the latest tail page version
                             current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_number) 
                             
-                            # Only delete the base page's RID after copying it, as it is needed to delete tail page records
-                            # it seems like we need to delete the primary key not the RID, as the key is used when selecting.
+                            # then delete the RID and timestamp
                             base_page.pages[config.RID_COLUMN].write(0, record_number) # set base page RID to 0
-                            # base_page.pages[config.PRIMARY_KEY_COLUMN].write(0, record_number) # set base page Primary Key to 0
-                            
-                            # print(f"new RID is {base_page.pages[config.RID_COLUMN].read(record_number)}")
+                            base_page.pages[config.TIMESTAMP_COLUMN].write(0, record_number) # set the timestamp to 0 as well
 
                             while current_rid != 0 and current_rid in self.table.page_directory:
                                 # use the RID to get the next tail page and record
                                 tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
                                 tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
 
-                                # if we want to delete all tail page records along the way.
-                                # otherwise move the next line to outside the while loop, so that only the last instance is removed
+                                # to delete all tail page records along the way.
                                 tail_page.pages[config.RID_COLUMN].write(0, tail_record_num)
-
-                                # same as above, set primary key to 0, not RID
-                                # tail_page.pages[config.PRIMARY_KEY_COLUMN].write(0, tail_record_num)
+                                tail_page.pages[config.TIMESTAMP_COLUMN].write(0, tail_record_num)
 
                                 current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)  # Move to the next older version
                             
-                            # successfully deleted
-                            return True
-                            
-                # very inefficient, do not use unless absolutely necessary
-                # for tail_page in page_range.tail_pages:
-                #     for record_number in range(0, tail_page.pages.num_records):
-                #         if tail_page.page[4].read(record_number) == primary_key: #5th column is the primary key
-                #             tail_page.page[0].write(0, record_number) # set rid to 0
-
-            
+                            return True            
             # if we reach here, the record does not exist
             return False
     
+    # is this function ever used? we might be able to remove it.
     def get_vals(self, rid):
         if rid in self.table.page_directory:
             return self.table.page_directory[rid]
@@ -317,7 +300,53 @@ class Query:
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
     def update(self, primary_key, *columns):
-        pass
+        
+        # try something like `cols = [1] * self.table.num_columns`
+        record = self.select(primary_key, self.table.key, [1] * self.table.num_columns)[0]
+        if record == False:
+            # record not found
+            return False
+    
+        # base page- ok so rid found- getting page details for that
+        page_range_num, base_page_num, record_num = self.table.page_directory[record]
+        base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
+    
+        # recent RID from indirection column
+        current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_num)
+        latest_rid = record if current_rid == 0 or current_rid is None else current_rid #excisting rid if indirection not valid
+    
+        # new RID for the updated version
+        new_rid = self.rid_counter
+        self.rid_counter += 1
+    
+        # tail page- check space first- then if full add new tail page- idk if redu
+        page_range = self.table.page_ranges[page_range_num]
+        if not page_range.tail_pages or page_range.tail_pages[-1].pages[0].is_full():
+            page_range.tail_pages.append(pageRange(num_columns=self.table.num_columns))  
+
+        #last tail page and the slot in that page for the new record
+        tail_page = page_range.tail_pages[-1]
+        tail_record_num = tail_page.pages[0].num_records
+        
+        # here need something that saves? updated values wjhile keeping the unmodified
+        #if columns[i] is None else columns[i]
+            #for i in range(self.table.num_columns)
+        
+    
+        # needs to create the record like in regular insert
+
+        # finally insert updated values into the Tail Page
+        tail_page.pages[config.RID_COLUMN].insert(new_rid)
+        tail_page.pages[config.INDIRECTION_COLUMN].insert(None) 
+        for i in range(self.table.num_columns): #update the values users give?
+            tail_page.pages[i + config.USER_COLUMN_START].insert(updated_values[i])
+    
+        # Update indirection in BP to point to the new version
+        base_page.pages[config.INDIRECTION_COLUMN].write(new_rid, record_num)
+    
+    
+        return True 
+        #if false then what
     
     """
     :param start_range: int         # Start of the key range to aggregate 
@@ -329,6 +358,7 @@ class Query:
     """
     def sum(self, start_range, end_range, aggregate_column_index):
         # ensure that start range is lower than end range
+        
         if(start_range > end_range):
             start_range, end_range = end_range, start_range
 
@@ -337,7 +367,7 @@ class Query:
         
         for key in range(start_range, end_range+1):
             # same line from the increment function
-            row = self.select(key, self.table.key, [1] * self.table.num_columns)[0]
+            row = self.select(key, self.table.key, [1] * self.table.num_columns)
             
             # validate row
             if row is False:
@@ -346,7 +376,7 @@ class Query:
             range_not_empty = True
 
             # add the cell to the sum
-            sum += row[aggregate_column_index]
+            sum += row[0].columns[aggregate_column_index]
 
         if range_not_empty==False:
             return False
@@ -374,10 +404,10 @@ class Query:
     # Returns False if no record matches key or if target record is locked by 2PL.
     """
     def increment(self, key, column):
-        r = self.select(key, self.table.key, [1] * self.table.num_columns)[0]
+        r = self.select(key, self.table.key, [1] * self.table.num_columns)
         if r is not False:
             updated_columns = [None] * self.table.num_columns
-            updated_columns[column] = r[column] + 1
+            updated_columns[column] = r[0].columns[column] + 1
             u = self.update(key, *updated_columns)
             return u
         return False
