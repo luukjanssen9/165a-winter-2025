@@ -49,7 +49,9 @@ class Query:
                                 tail_page.pages[config.TIMESTAMP_COLUMN].write(0, tail_record_num)
 
                                 current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)  # Move to the next older version
-                            
+
+                            # update index
+                            del self.table.index.indices[config.PRIMARY_KEY_COLUMN][primary_key]
                             return True            
             # if we reach here, the record does not exist
             return False
@@ -126,7 +128,7 @@ class Query:
         self.table.page_directory[rid] = (page_range_number, base_page_number, record_number)
 
         # Add to index if applicable
-        
+        self.table.index.indices[config.PRIMARY_KEY_COLUMN][primary_key] = [rid]
         return True
 
    
@@ -418,7 +420,8 @@ class Query:
         
         # print(f"DEBUG: New indirection RID set: {base_page.pages[config.INDIRECTION_COLUMN].read(record_num)}")
 
-
+        # update index
+        self.table.index.indices[config.PRIMARY_KEY_COLUMN][primary_key] = [new_rid]
         # print("Update successful")
         return True
     
