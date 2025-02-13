@@ -21,8 +21,8 @@ class Index:
         if column not in self.indices or self.indices[column] is None:
             print(f"no index exists for column {column}")
             return [] # [] ensures function always returns an iterable
-        else:
-            return self.indices[column].get(value, []) # If value is not found, return an empty list instead of None
+        rid = self.indices[column].get(value, [])  # Fetch RID(s) from the index
+        return [rid] if isinstance(rid, int) else rid  # Convert single int to list
 
 
     """

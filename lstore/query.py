@@ -125,6 +125,19 @@ class Query:
         # Update page directory for hash table
         self.table.page_directory[rid] = (page_range_number, base_page_number, record_number)
 
+        # Automatically create indexes for all columns if they don't exist
+        for col in range(self.table.num_columns):
+            if self.table.index.indices[col] is None:
+                self.table.index.create_index(col)  # Create index for column
+
+        # Add record to all indices
+        for col, value in enumerate(columns):
+            if value is not None:  # Only index non-null values
+                if value in self.table.index.indices[col]:
+                    self.table.index.indices[col][value].append(rid)  # Append RID if value exists
+                else:
+                    self.table.index.indices[col][value] = [rid]  # Create new list for RID
+
         # TODO: Implement indexing
         return True
 
@@ -142,23 +155,13 @@ class Query:
     def select(self, search_key, search_key_index, projected_columns_index):
         # TODO: do we use search_key_index?
         records = []
-
+        # Use index for primary key lookups
         if search_key_index == self.table.key:
             # Use page directory for fast lookup if searching by primary key
-            rid = None
-            for rid_key, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
-                stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[config.PRIMARY_KEY_COLUMN].read(record_num)                
-                
-                # gets the RID
-                get_RID = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[config.RID_COLUMN].read(record_num)
-
-                # only lets it through if the RID wasnt deleted
-                if ((stored_primary_key == search_key) and (get_RID!=0)):
-                    rid = rid_key
-                    break
-
-            if rid is None:
-                return False 
+            rid_list = self.table.index.locate(search_key_index, search_key)
+            if not rid_list:
+                return False  # If the list is empty, return False
+            rid = rid_list[0]  # Get the first matching RID
 
             # Locate the record in the page directory using RID
             page_range_num, base_page_num, record_num = self.table.page_directory[rid]
