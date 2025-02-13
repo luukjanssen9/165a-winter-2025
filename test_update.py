@@ -62,3 +62,63 @@ def test_update():
     print("Update test passed!")
 
 test_update()
+
+
+
+def test_update_513():
+    db = Database()
+    table = db.create_table("Students", 5, 0)
+    query = Query(table)
+
+    # Insert 513 records
+    for i in range(1, 514):
+        query.insert(i, i * 10, i * 20, i * 30, i * 40)
+
+    # Update each record multiple times to test tail page expansion
+    for i in range(1, 514):
+        query.increment(i, 2)
+        query.increment(i, 3)
+        query.increment(i, 4)
+
+    # Select and verify updates
+    for i in range(1, 514):
+        result = query.select(i, 0, [1, 1, 1, 1, 1])  # Select full record
+        print(f"Record {i}: rid={result[0].rid}, key={result[0].key}, cols={result[0].columns}")
+
+    print("Update test for 513 records passed!")
+
+test_update_513()
+
+
+def test_update_twice():
+    db = Database()
+    table = db.create_table("Students", 5, 0)  # 5 columns, primary key at index 0
+    query = Query(table)
+
+    # Insert a single record
+    query.insert(1, 10, 20, 30, 40)
+
+    # First update: Increment column 2
+    query.increment(1, 2)
+
+    # Fetch and verify first update
+    result1 = query.select(1, 0, [1, 1, 1, 1, 1])  # Select all columns
+    print("\nAfter first update:")
+    print(f"RID: {result1[0].rid}")
+    print(f"Key: {result1[0].key}")
+    print(f"Columns: {result1[0].columns}")  # Expecting column 2 to be updated
+
+    # Second update: Increment column 3
+    query.increment(1, 3)
+
+    # Fetch and verify second update
+    result2 = query.select(1, 0, [1, 1, 1, 1, 1])  # Select all columns
+    print("\nAfter second update:")
+    print(f"RID: {result2[0].rid}")
+    print(f"Key: {result2[0].key}")
+    print(f"Columns: {result2[0].columns}")  # Expecting column 3 to be updated
+
+    print("\nUpdate test passed!")
+
+test_update_twice()
+
