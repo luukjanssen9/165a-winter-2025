@@ -126,12 +126,12 @@ class Query:
         self.table.page_directory[rid] = (page_range_number, base_page_number, record_number)
 
         # Add to index if applicable
-        if self.table.index:
-            self.table.index.update_index(self.table.key, primary_key, rid)  # Index the primary key
-            for col_index in range(self.table.num_columns):
-                if col_index != self.table.key:  # Don't index the primary key again
-                    column_value = columns[col_index]
-                    self.table.index.update_index(col_index, column_value, rid)
+        
+        self.table.index.update_index(self.table.key, primary_key, rid)  # Index the primary key
+        for col_index in range(self.table.num_columns):
+            if col_index != self.table.key:  # Don't index the primary key again
+                column_value = columns[col_index]
+                self.table.index.update_index(col_index, column_value, rid)
         return True
 
    
