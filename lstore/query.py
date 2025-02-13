@@ -168,21 +168,7 @@ class Query:
             current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_num) 
             latest_version = (base_page, record_num)
 
-            MAX_CHAIN_LENGTH = 1000  # Prevent infinite loops
-            iteration_count = 0
-            visited_rids = set()
-
             while current_rid != 0 and current_rid in self.table.page_directory:
-                if iteration_count > MAX_CHAIN_LENGTH:
-                    # print("ERROR: Infinite loop detected in indirection chain in select()!")
-                    break
-                if current_rid in visited_rids:
-                    # print("ERROR: Cycle detected in indirection chain in select()!")
-                    break
-                visited_rids.add(current_rid)
-                iteration_count += 1
-
-
                 tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
                 tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
                 latest_version = (tail_page, tail_record_num)  # Update latest version
@@ -322,7 +308,12 @@ class Query:
         rid = None # set to none to check for matching
         for rid_key, (page_range_num, base_page_num, record_num) in self.table.page_directory.items(): #searcing directory to find record
             stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[config.PRIMARY_KEY_COLUMN].read(record_num)
-            if stored_primary_key == primary_key: # if matching found fix rid
+            
+            # get the RID
+            current_rid = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[config.RID_COLUMN].read(record_num)
+
+            # only lets it through if the RID wasnt deleted
+            if ((stored_primary_key == primary_key) and (current_rid!=0)): # if matching found fix rid
                 rid = rid_key
                 break
     
@@ -331,17 +322,31 @@ class Query:
             return False  
     
 
-        # print("Matching record found, RID:", rid)
-
-        # base page- ok so rid found- getting page details for that
+        # Locate the record in the page directory using RID
         page_range_num, base_page_num, record_num = self.table.page_directory[rid]
         base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
 
-        # Get the current values of the record
-        current_values = [base_page.pages[i + 4].read(record_num) for i in range(self.table.num_columns)]
-        updated_values = [columns[i] if columns[i] is not None else current_values[i] for i in range(self.table.num_columns)]
+        # Follow indirection pointer to get the latest version
+        current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_num) 
+        latest_version = (base_page, record_num)
 
-        # print("Current values:", current_values)
+        while current_rid != 0 and current_rid in self.table.page_directory:
+            tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
+            tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
+            latest_version = (tail_page, tail_record_num)  # Update latest version
+            current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)  # Move to the next older version
+
+        # Read the final/latest version of the record
+        version_page, version_record_num = latest_version
+        stored_values = [version_page.pages[i + 4].read(version_record_num) for i in range(self.table.num_columns)]
+        stored_primary_key = base_page.pages[4].read(record_num)
+
+
+        # Get the current values of the record
+        updated_values = [columns[i] if columns[i] is not None else stored_values[i] for i in range(self.table.num_columns)]
+        # might be num cols -1
+
+        # print("Current values:", stored_values)
         # print("Updated values:", updated_values)
 
         # Create a new version of the record
