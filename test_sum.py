@@ -34,10 +34,10 @@ def test_inc():
     # query.insert(4, 70, 20, 43, 870)
 
     # take a sum, (2, 4, 3) means that take from the range 2-4, in the third column. that would be 12+85+43 = 140
-    result = query.increment(2, 4)
+    result = query.increment(3, 3)
     print(f"result is {result}")
 
-    incremented = query.select(2, 0, [1, 1, 1, 1, 1])  # Get all columns
+    incremented = query.select(3, 0, [1, 1, 1, 1, 1])  # Get all columns
     print(incremented[0].columns)
 
     print("Increment test passed!")

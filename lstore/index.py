@@ -18,11 +18,11 @@ class Index:
     """
 
     def locate(self, column, value):
-        if column not in self.indices:
+        if column not in self.indices or self.indices[column] is None:
             print(f"no index exists for column {column}")
-            return False
+            return [] # [] ensures function always returns an iterable
         else:
-            return self.indices[column][value]
+            return self.indices[column].get(value, []) # If value is not found, return an empty list instead of None
 
 
     """
@@ -32,15 +32,16 @@ class Index:
     def locate_range(self, begin, end, column):
         if self.indices[column] == None:
             print("error: this column is not indexed")
-            return False
+            return []
 
         if begin>end: # ensure that begin is smaller than end
             begin, end = end, begin
 
         rid_list = []
         for key in range(begin, end+1):
-            value = self.indices[column][key] # grab the value from the index
-            rid_list.append(value)
+            value = self.indices[column].get(key, None)  # Use `.get()` to prevent `KeyError`
+            if value is not None:
+                rid_list.append(value)
         
         return rid_list
 
@@ -55,6 +56,7 @@ class Index:
         
         # create an index for that column number
         self.indices[column_number] = defaultdict(lambda: None)
+        return True
 
     """
     # optional: Drop index of specific column
@@ -64,6 +66,7 @@ class Index:
         if column_number == config.PRIMARY_KEY_COLUMN:
             print("error: cant drop primary key index")
             return False
-        else: 
-            self.indices[column_number] = None
-            return True
+        if self.indices[column_number] == None:
+            return False
+        self.indices[column_number] = None
+        return True
