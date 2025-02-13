@@ -7,8 +7,10 @@ class Page:
         self.data = bytearray(config.ARRAY_SIZE)
 
     def has_capacity(self):
-        if self.num_records < config.ARRAY_SIZE/config.VALUE_SIZE:
+        if self.num_records < int(config.ARRAY_SIZE/config.VALUE_SIZE):
+            # print(f"{self.num_records}/{int(config.ARRAY_SIZE/config.VALUE_SIZE)}")
             return True
+        # print(f"{self.num_records}/{int(config.ARRAY_SIZE/config.VALUE_SIZE)}")
         return False
 
     def write(self, value, record_number):
@@ -18,7 +20,7 @@ class Page:
             self.num_records += 1
             return True
         else:
-            print("error: page is full")  
+            print(f"error: full, {self.num_records}/{int(config.ARRAY_SIZE/config.VALUE_SIZE)}")
             return False
 
 

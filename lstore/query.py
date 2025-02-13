@@ -98,6 +98,7 @@ class Query:
                 if base_page.has_capacity():
                     page_range_number, base_page_number = pr_num, bp_num
                     record_number = base_page.pages[0].num_records  # Use next available slot
+                    print(f"using {pr_num}, {bp_num}, {record_number}")
                     break
             if page_range_number is not None:
                 break
@@ -353,9 +354,15 @@ class Query:
 
         # Find available location to write the new version
         page_range = self.table.page_ranges[page_range_num]
-        if not page_range.tail_pages or not page_range.tail_pages[-1].pages[0].has_capacity():
-            # print("Adding new tail page")
-            page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))
+        if not page_range.tail_pages or not any(page.pages[0].has_capacity() for page in page_range.tail_pages):
+            print("Adding new tail page")
+            print(f"curr tail page num = {len(page_range.tail_pages)}")
+            new_tail_page = PageGroup(num_columns=self.table.num_columns)
+            page_range.tail_pages.append(new_tail_page)
+        
+        # if not page_range.tail_pages or not page_range.tail_pages[-1].pages[0].has_capacity():
+        #     # print("Adding new tail page")
+        #     page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))
 
         # Last tail page and the slot in that page for the new record
         # tail_page = page_range.tail_pages[-1]
@@ -363,6 +370,7 @@ class Query:
         # print("DEBUG: type of page_range.tail_pages[-1] =", type(page_range.tail_pages[-1]))
 
         tail_page_group = page_range.tail_pages[-1]
+        print(f"new tail page num = {len(page_range.tail_pages)}")
         tail_record_num = tail_page_group.pages[0].num_records
 
         # print("Writing new version to tail page at record number:", tail_record_num)
