@@ -363,12 +363,27 @@ class Query:
 
         # Find available location to write the new version
         page_range = self.table.page_ranges[page_range_num]
-        if not page_range.tail_pages or not any(page.pages[0].has_capacity() for page in page_range.tail_pages):
-            print("Adding new tail page")
-            print(f"curr tail page num = {len(page_range.tail_pages)}")
-            new_tail_page = PageGroup(num_columns=self.table.num_columns)
-            page_range.tail_pages.append(new_tail_page)
+
+        if not page_range.tail_pages:
+            # print("creating a tail page")
+            page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))
+
+
+        tailpage = page_range.tail_pages[-1]
+        page = tailpage.pages[-1]
+        # for page in tailpage.pages:
+        if page.has_capacity()==False:
+            # print(f"phys page is full, creating new page")
+            page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))
+
+        # if not (page.pages[-1].has_capacity() for page in page_range.tail_pages):
+        #     print("Adding new tail page")
+        #     print(f"curr tail page num = {len(page_range.tail_pages)}")
+        #     new_tail_page = PageGroup(num_columns=self.table.num_columns)
+        #     page_range.tail_pages.append(new_tail_page)
         
+
+
         # if not page_range.tail_pages or not page_range.tail_pages[-1].pages[0].has_capacity():
         #     # print("Adding new tail page")
         #     page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))
@@ -378,9 +393,11 @@ class Query:
         # tail_record_num = tail_page.pages[0].num_records
         # print("DEBUG: type of page_range.tail_pages[-1] =", type(page_range.tail_pages[-1]))
 
+        page_range = self.table.page_ranges[page_range_num]
         tail_page_group = page_range.tail_pages[-1]
-        print(f"new tail page num = {len(page_range.tail_pages)}")
-        tail_record_num = tail_page_group.pages[0].num_records
+        # print(f"new tail page num = {len(page_range.tail_pages)}")
+        tail_record_num = tail_page_group.pages[-1].num_records
+        # print(f"new tail record num = {tail_record_num}")
 
         # print("Writing new version to tail page at record number:", tail_record_num)
 
@@ -394,7 +411,10 @@ class Query:
 
         # print(f"DEBUG: Updating base record at {record_num} with new indirection RID: {new_rid}")
         # print(f"DEBUG: Previous indirection RID: {base_page.pages[config.INDIRECTION_COLUMN].read(record_num)}")
-        base_page.pages[config.INDIRECTION_COLUMN].write(new_rid, record_num)
+        # base_page.pages[config.INDIRECTION_COLUMN].write(new_rid, record_num)
+        offset_number = record_num * config.VALUE_SIZE
+        base_page.pages[config.INDIRECTION_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = new_rid.to_bytes(config.VALUE_SIZE, byteorder='little')
+        
         # print(f"DEBUG: New indirection RID set: {base_page.pages[config.INDIRECTION_COLUMN].read(record_num)}")
 
 

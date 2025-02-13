@@ -10,17 +10,19 @@ class Page:
         if self.num_records < int(config.ARRAY_SIZE/config.VALUE_SIZE):
             # print(f"{self.num_records}/{int(config.ARRAY_SIZE/config.VALUE_SIZE)}")
             return True
-        # print(f"{self.num_records}/{int(config.ARRAY_SIZE/config.VALUE_SIZE)}")
+        # print(f"page has no capacity: {self.num_records}/{int(config.ARRAY_SIZE/config.VALUE_SIZE)}")
         return False
 
     def write(self, value, record_number):
+        # assert self.has_capacity()
         if self.has_capacity():
             offset_number = record_number * config.VALUE_SIZE
             self.data[offset_number:offset_number + config.VALUE_SIZE] = value.to_bytes(config.VALUE_SIZE, byteorder='little')
             self.num_records += 1
+            # print(f"successfully wrote to page, new number is {self.num_records}")
             return True
         else:
-            print(f"error: full, {self.num_records}/{int(config.ARRAY_SIZE/config.VALUE_SIZE)}")
+            print(f"failed to write: full, {self.num_records}/{int(config.ARRAY_SIZE/config.VALUE_SIZE)}")
             return False
 
 
