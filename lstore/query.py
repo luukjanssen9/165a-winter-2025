@@ -98,7 +98,9 @@ class Query:
                 if base_page.has_capacity():
                     page_range_number, base_page_number = pr_num, bp_num
                     record_number = base_page.pages[0].num_records  # Use next available slot
-                    print(f"using {pr_num}, {bp_num}, {record_number}")
+                    
+                    # DEBUG: Print the page range, base page, and record number
+                    # print(f"using {pr_num}, {bp_num}, {record_number}")
                     break
             if page_range_number is not None:
                 break
@@ -145,7 +147,7 @@ class Query:
             # Use page directory for fast lookup if searching by primary key
             rid = None
             for rid_key, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
-                stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[4].read(record_num)
+                stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[config.PRIMARY_KEY_COLUMN].read(record_num)                
                 
                 # gets the RID
                 get_RID = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[config.RID_COLUMN].read(record_num)
@@ -198,29 +200,31 @@ class Query:
             records.append(Record(search_key, search_key, projected_values))
 
         else:
-            # Scan all records if searching by a non-primary key column
-            for rid_key, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
-                stored_value = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[search_key_index + 5].read(record_num)
-                if stored_value == search_key:
-                    # Follow the indirection chain to get the latest version
-                    current_rid = rid_key
-                    latest_version = (self.table.page_ranges[page_range_num].base_pages[base_page_num], record_num)
-
-                    while current_rid != 0 and current_rid in self.table.page_directory:
-                        tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
-                        tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
-                        latest_version = (tail_page, tail_record_num)  # Update latest version
-                        current_rid = tail_page.pages[0].read(tail_record_num)  # Move to next older version
-
-                    # Read the final/latest version of the record
-                    version_page, version_record_num = latest_version
-                    stored_values = [version_page.pages[i + 5].read(version_record_num) for i in range(self.table.num_columns - 1)]
-                    stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[4].read(record_num)
-
-                    projected_values = [stored_primary_key] + [
-                        stored_values[i] if projected_columns_index[i + 1] else None for i in range(self.table.num_columns - 1)
-                    ]
-                    records.append(Record(stored_primary_key, search_key, projected_values))
+            # Use the index to find all matching RIDs instead of scanning everything
+            rid_list = self.table.index.locate(search_key_index, search_key)
+            if not rid_list:
+                return False  # No records found
+            for rid in rid_list:
+                if rid not in self.table.page_directory:
+                    continue  # Skip invalid entries
+                page_range_num, base_page_num, record_num = self.table.page_directory[rid]
+                base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
+                # Follow indirection to get the latest version
+                current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_num)
+                latest_version = (base_page, record_num)
+                while current_rid != 0 and current_rid in self.table.page_directory:
+                    tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
+                    tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
+                    latest_version = (tail_page, tail_record_num)
+                    current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)
+                # Read the final/latest version of the record
+                version_page, version_record_num = latest_version
+                stored_values = [version_page.pages[i + 5].read(version_record_num) for i in range(self.table.num_columns - 1)]
+                stored_primary_key = base_page.pages[config.PRIMARY_KEY_COLUMN].read(record_num)
+                projected_values = [stored_primary_key] + [
+                    stored_values[i] if projected_columns_index[i + 1] else None for i in range(self.table.num_columns - 1)
+                ]
+                records.append(Record(stored_primary_key, search_key, projected_values))
 
         return records if records else False
 
