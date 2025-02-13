@@ -127,11 +127,6 @@ class Query:
 
         # Add to index if applicable
         
-        self.table.index.update_index(self.table.key, primary_key, rid)  # Index the primary key
-        for col_index in range(self.table.num_columns):
-            if col_index != self.table.key:  # Don't index the primary key again
-                column_value = columns[col_index]
-                self.table.index.update_index(col_index, column_value, rid)
         return True
 
    
