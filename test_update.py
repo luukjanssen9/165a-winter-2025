@@ -13,7 +13,6 @@ def test_update():
     query.insert(2, 50, 60, 70, 80)
 
     # updating record #1
-    # update seems to not be working
     query.increment(1, 2)
 
     # Selecting record #1
@@ -26,6 +25,32 @@ def test_update():
     print(f"rid: {result1[0].rid}")
     print(f"key: {result1[0].key}")
     print(f"cols: {result1[0].columns}")
+
+    # updating record #1
+    query.increment(1, 3)
+    query.increment(1, 4)
+    query.increment(1, 3)
+
+
+    result1 = query.select(1, 0, [1, 1, 1, 1, 1])  # Get all columns
+    # DEBUG, to see what the select returns:
+    print(f"\nafter update set 1:\nrid: {result1[0].rid}")
+    print(f"key: {result1[0].key}")
+    print(f"cols: {result1[0].columns}")
+
+
+    query.increment(1, 2)
+    query.increment(1, 2)
+    query.increment(1, 4)
+
+    result1 = query.select(1, 0, [1, 1, 1, 1, 1])  # Get all columns
+    # DEBUG, to see what the select returns:
+    print(f"\nafter update set 2:\nrid: {result1[0].rid}")
+    print(f"key: {result1[0].key}")
+    print(f"cols: {result1[0].columns}")
+
+
+
     
     # assert result2 is False, "Incorrect delete output"
     # if result2==False: print(f"\npassed")
