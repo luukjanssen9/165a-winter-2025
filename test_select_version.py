@@ -31,9 +31,15 @@ def test_select_version_old():
     query.update(1, None, None, 99, None, None)  # Update column index 2
 
     # Select the previous version
-    result = query.select_version(1, 0, [1, 1, 1, 1, 1], 1)
-    assert result is not False, "Select previous version failed"
-    assert result[0].columns == [1, 10, 20, 30, 40], "Incorrect previous version result"
+    resultprev = query.select_version(1, 0, [1, 1, 1, 1, 1], -1)
+    resultcurr = query.select_version(1, 0, [1, 1, 1, 1, 1], 0)
+    print(f"prev: {resultprev[0].columns[2]}")
+    print(f"curr: {resultcurr[0].columns[2]}")
+
+
+
+    assert resultprev is not False, "Select previous version failed"
+    assert resultprev[0].columns == [1, 10, 20, 30, 40], "Incorrect previous version result"
 
     print(" Select previous version test passed!")
 
