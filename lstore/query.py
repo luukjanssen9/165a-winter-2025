@@ -66,11 +66,11 @@ class Query:
         # Validate column count and prevent insertion if column count does not match
         if len(columns) != self.table.num_columns:
             return False  
+        
 
         primary_key = columns[self.table.key]  # Get primary key value
-
         # Check if primary key already exists
-        if primary_key not in self.table.index.indices[config.PRIMARY_KEY_COLUMN]:
+        if primary_key in self.table.index.indices[config.PRIMARY_KEY_COLUMN]:
             return False  # Prevent duplicate insertion
         
         # Generate metadata
