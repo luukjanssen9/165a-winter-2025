@@ -15,6 +15,7 @@ class Page:
 
     def write(self, value, record_number):
         # assert self.has_capacity()
+        assert self.has_capacity()
         if self.has_capacity():
             offset_number = record_number * config.VALUE_SIZE
             self.data[offset_number:offset_number + config.VALUE_SIZE] = value.to_bytes(config.VALUE_SIZE, byteorder='little')

@@ -28,36 +28,62 @@ class Query:
             return False
         rid = rid_list[0]
 
-        # loop through all records to find the correct one
-        for page_range in self.table.page_ranges:
-            for base_page in page_range.base_pages:
-                for page in range(0, len(base_page.pages)):
-                    for record_number in range(0, base_page.pages[page].num_records): 
+        page_range_num, base_page_num, record_num = self.table.page_directory[rid]
+        base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
+
+        # # Follow indirection pointer to get the latest version
+        # current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_num) 
+        
+        # base_page.pages[config.RID_COLUMN].write(0, record_num) # set base page RID to 0
+        # base_page.pages[config.TIMESTAMP_COLUMN].write(0, record_num) # set the timestamp to 0 as well
+        # base_page.pages[config.INDIRECTION_COLUMN].write(0, record_num) # set the indirection to 0 too
+        
+        # then delete the RID, timestamp, and indirection
+        zeroed = 0
+        offset_number = record_num * config.VALUE_SIZE
+        base_page.pages[config.RID_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
+        base_page.pages[config.TIMESTAMP_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
+        base_page.pages[config.INDIRECTION_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
+        
+        self.table.index.indices[config.PRIMARY_KEY_COLUMN][primary_key] = [None]
+
+        # print(f"successfully deleted")
+
+        return True            
+    
+
+        
+        
+        # # loop through all records to find the correct one
+        # for page_range in self.table.page_ranges:
+        #     for base_page in page_range.base_pages:
+        #         for page in range(0, len(base_page.pages)):
+        #             for record_number in range(0, base_page.pages[page].num_records): 
                         
-                        # check if the record primary key is the same as the one we want to delete
-                        if base_page.pages[config.PRIMARY_KEY_COLUMN].read(record_number) == primary_key: #5th column is the primary key
+        #                 # check if the record primary key is the same as the one we want to delete
+        #                 if base_page.pages[config.PRIMARY_KEY_COLUMN].read(record_number) == primary_key: #5th column is the primary key
                             
-                            # Follow indirection pointer to get the latest tail page version
-                            current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_number) 
+        #                     # Follow indirection pointer to get the latest tail page version
+        #                     current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_number) 
                             
-                            # then delete the RID and timestamp
-                            base_page.pages[config.RID_COLUMN].write(0, record_number) # set base page RID to 0
-                            base_page.pages[config.TIMESTAMP_COLUMN].write(0, record_number) # set the timestamp to 0 as well
+        #                     # then delete the RID and timestamp
+        #                     base_page.pages[config.RID_COLUMN].write(0, record_number) # set base page RID to 0
+        #                     base_page.pages[config.TIMESTAMP_COLUMN].write(0, record_number) # set the timestamp to 0 as well
 
-                            while current_rid != 0 and current_rid in self.table.page_directory:
-                                # use the RID to get the next tail page and record
-                                tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
-                                tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
+        #                     while current_rid != 0 and current_rid in self.table.page_directory:
+        #                         # use the RID to get the next tail page and record
+        #                         tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
+        #                         tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
 
-                                # to delete all tail page records along the way.
-                                tail_page.pages[config.RID_COLUMN].write(0, tail_record_num)
-                                tail_page.pages[config.TIMESTAMP_COLUMN].write(0, tail_record_num)
+        #                         # to delete all tail page records along the way.
+        #                         tail_page.pages[config.RID_COLUMN].write(0, tail_record_num)
+        #                         tail_page.pages[config.TIMESTAMP_COLUMN].write(0, tail_record_num)
 
-                                current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)  # Move to the next older version
+        #                         current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)  # Move to the next older version
                             
-                            return True            
-            # if we reach here, the record does not exist
-            return False
+        #                     return True            
+        # # if we reach here, the record does not exist
+        # return False
     
     # is this function ever used? we might be able to remove it.
     def get_vals(self, rid):
@@ -183,8 +209,8 @@ class Query:
             #     if ((stored_primary_key == search_key) and (get_RID!=0)):
             #         rid = rid_key
             #         break
-
-            if rid is None:
+            # print(f"rid is {rid}")
+            if rid is None or rid==0:
                 return False 
 
             # Locate the record in the page directory using RID

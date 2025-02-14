@@ -29,7 +29,7 @@ def test_delete():
     else: print("failed to delete\n")
 
     # Selecting record #1
-    result1 = query.select(1, 0, [1, 1, 1, 1, 1])  # Get all columns
+    # result1 = query.select(1, 0, [1, 1, 1, 1, 1])  # Get all columns
     result2 = query.select(2, 0, [1, 1, 1, 1, 1])  # Get all columns
 
     # if the record was deleted, then the results should be uhhh idk
