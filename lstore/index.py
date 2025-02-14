@@ -3,7 +3,7 @@ A data strucutre holding indices for various columns of a table. Key column shou
 """
 
 from collections import defaultdict
-import config
+from lstore import config
 
 class Index:
 

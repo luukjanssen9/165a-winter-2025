@@ -146,21 +146,11 @@ class Query:
         records = []
 
         if search_key_index == self.table.key:
-            # Use page directory for fast lookup if searching by primary key
-            rid = None
-            for rid_key, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
-                stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[config.PRIMARY_KEY_COLUMN].read(record_num)                
-                
-                # gets the RID
-                get_RID = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[config.RID_COLUMN].read(record_num)
-
-                # only lets it through if the RID wasnt deleted
-                if ((stored_primary_key == search_key) and (get_RID!=0)):
-                    rid = rid_key
-                    break
-
-            if rid is None:
-                return False 
+            rid_list = self.table.index.indices[config.PRIMARY_KEY_COLUMN][search_key]
+            if rid_list is None:
+                return False
+            rid = rid_list[0]
+            print(f"rid is {rid}")
 
             # Locate the record in the page directory using RID
             page_range_num, base_page_num, record_num = self.table.page_directory[rid]
@@ -452,28 +442,28 @@ class Query:
             start_range, end_range = end_range, start_range
 
         # get rids of all matching records
-        rids = self.table.index.locate_range(start_range,end_range)
-        if (len(rids) == 0):
+        RIDs = self.table.index.locate_range(start_range,end_range)
+        if (len(RIDs) == 0):
             return False
         
         sum = 0        
-        for key in range(start_range, end_range+1):
+        for record_num in RIDs:
             # same line from the increment function
-            row = self.select(key, self.table.key, [1] * self.table.num_columns)
+            row = self.select(record_num, self.table.key, [1] * self.table.num_columns)
+
+            page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
+            stored_values = [version_page.pages[i + 5].read(version_record_num) for i in range(self.table.num_columns - 1)]
+            
             
             # validate row
             if row is False:
                 continue
-            # at least one valid row
-            range_not_empty = True
 
             val = row[0].columns[aggregate_column_index]
             # add the cell to the sum
             if val != None:
                 sum += val
 
-        if range_not_empty==False:
-            return False
         else: return sum
     
     """
