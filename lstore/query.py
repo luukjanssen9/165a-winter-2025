@@ -403,32 +403,33 @@ class Query:
     # Returns False if no record exists in the given range
     """
     def sum(self, start_range, end_range, aggregate_column_index):
-        # ensure that start range is lower than end range
-        
-        if(start_range > end_range):
-            start_range, end_range = end_range, start_range
+        return self.sum_version(start_range, end_range, aggregate_column_index, 0)
 
-        sum = 0
-        range_not_empty = False
+        # # ensure that start range is lower than end range
+        # if(start_range > end_range):
+        #     start_range, end_range = end_range, start_range
+
+        # sum = 0
+        # range_not_empty = False
         
-        for key in range(start_range, end_range+1):
-            # same line from the increment function
-            row = self.select(key, self.table.key, [1] * self.table.num_columns)
+        # for key in range(start_range, end_range+1):
+        #     # same line from the increment function
+        #     row = self.select(key, self.table.key, [1] * self.table.num_columns)
             
-            # validate row
-            if row is False:
-                continue
-            # at least one valid row
-            range_not_empty = True
+        #     # validate row
+        #     if row is False:
+        #         continue
+        #     # at least one valid row
+        #     range_not_empty = True
 
-            val = row[0].columns[aggregate_column_index]
-            # add the cell to the sum
-            if val != None:
-                sum += val
+        #     val = row[0].columns[aggregate_column_index]
+        #     # add the cell to the sum
+        #     if val != None:
+        #         sum += val
 
-        if range_not_empty==False:
-            return False
-        else: return sum
+        # if range_not_empty==False:
+        #     return False
+        # else: return sum
     
     """
     :param start_range: int         # Start of the key range to aggregate 
@@ -441,7 +442,6 @@ class Query:
     """
     def sum_version(self, start_range, end_range, aggregate_column_index, relative_version):
         # ensure that start range is lower than end range
-        
         if(start_range > end_range):
             start_range, end_range = end_range, start_range
 
@@ -466,8 +466,6 @@ class Query:
         if range_not_empty==False:
             return False
         else: return sum
-    
-
     
     """
     incremenets one column of the record
