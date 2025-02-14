@@ -51,40 +51,6 @@ class Query:
 
         return True            
     
-
-        
-        
-        # # loop through all records to find the correct one
-        # for page_range in self.table.page_ranges:
-        #     for base_page in page_range.base_pages:
-        #         for page in range(0, len(base_page.pages)):
-        #             for record_number in range(0, base_page.pages[page].num_records): 
-                        
-        #                 # check if the record primary key is the same as the one we want to delete
-        #                 if base_page.pages[config.PRIMARY_KEY_COLUMN].read(record_number) == primary_key: #5th column is the primary key
-                            
-        #                     # Follow indirection pointer to get the latest tail page version
-        #                     current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_number) 
-                            
-        #                     # then delete the RID and timestamp
-        #                     base_page.pages[config.RID_COLUMN].write(0, record_number) # set base page RID to 0
-        #                     base_page.pages[config.TIMESTAMP_COLUMN].write(0, record_number) # set the timestamp to 0 as well
-
-        #                     while current_rid != 0 and current_rid in self.table.page_directory:
-        #                         # use the RID to get the next tail page and record
-        #                         tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
-        #                         tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
-
-        #                         # to delete all tail page records along the way.
-        #                         tail_page.pages[config.RID_COLUMN].write(0, tail_record_num)
-        #                         tail_page.pages[config.TIMESTAMP_COLUMN].write(0, tail_record_num)
-
-        #                         current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)  # Move to the next older version
-                            
-        #                     return True            
-        # # if we reach here, the record does not exist
-        # return False
-    
     # is this function ever used? we might be able to remove it.
     def get_vals(self, rid):
         if rid in self.table.page_directory:
@@ -104,10 +70,8 @@ class Query:
         primary_key = columns[self.table.key]  # Get primary key value
 
         # Check if primary key already exists
-        for rid, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
-            stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[4].read(record_num)
-            if stored_primary_key == primary_key:
-                return False  # Prevent duplicate insertion
+        if primary_key not in self.table.index.indices[config.PRIMARY_KEY_COLUMN]:
+            return False  # Prevent duplicate insertion
         
         # Generate metadata
         rid = self.rid_counter
