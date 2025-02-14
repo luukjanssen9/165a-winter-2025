@@ -304,123 +304,120 @@ class Query:
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
     def update(self, primary_key, *columns):
+        
         # print("Starting update function")
-        rid = None # set to none to check for matching
-        for rid_key, (page_range_num, base_page_num, record_num) in self.table.page_directory.items(): #searcing directory to find record
+        rid = None  # Set to None to check for matching
+        for rid_key, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():  # Searching directory to find record
             stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[config.PRIMARY_KEY_COLUMN].read(record_num)
-            
-            # get the RID
+    
+            # Get the RID
             current_rid = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[config.RID_COLUMN].read(record_num)
-
-            # only lets it through if the RID wasnt deleted
-            if ((stored_primary_key == primary_key) and (current_rid!=0)): # if matching found fix rid
+    
+            # Only lets it through if the RID wasn't deleted
+            if (stored_primary_key == primary_key) and (current_rid != 0):  # If matching found, fix rid
                 rid = rid_key
                 break
     
-        if rid is None: # no match -> update fails
+        if rid is None:  # No match -> update fails
             # print("No matching record found")
             return False  
     
-
         # Locate the record in the page directory using RID
         page_range_num, base_page_num, record_num = self.table.page_directory[rid]
         base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
-
+    
         # Follow indirection pointer to get the latest version
         current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_num) 
+        latest_rid = rid if current_rid == 0 or current_rid is None else current_rid  # If no updates exist, use base RID
+    
         latest_version = (base_page, record_num)
-
+        
         while current_rid != 0 and current_rid in self.table.page_directory:
             tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
             tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
             latest_version = (tail_page, tail_record_num)  # Update latest version
             current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)  # Move to the next older version
-
+    
         # Read the final/latest version of the record
         version_page, version_record_num = latest_version
         stored_values = [version_page.pages[i + 4].read(version_record_num) for i in range(self.table.num_columns)]
-        stored_primary_key = base_page.pages[4].read(record_num)
-
-
+        stored_primary_key = base_page.pages[config.PRIMARY_KEY_COLUMN].read(record_num)
+    
         # Get the current values of the record
-        updated_values = [columns[i] if columns[i] is not None else stored_values[i] for i in range(self.table.num_columns)]
+        updated_values = [
+            columns[i] if columns[i] is not None else stored_values[i] 
+            for i in range(self.table.num_columns)
+        ]
         # might be num cols -1
-
-        # print("Current values:", stored_values)
-        # print("Updated values:", updated_values)
-
+    
+        # updating indexes dk if needed-if any indexed column is changed, remove old value from the index
+        #for col_index in range(self.table.num_columns):
+            #if columns[col_index] is not None and col_index in self.table.index.indices:
+                # Remove old value
+                #old_value = stored_values[col_index]
+                #self.table.index.indices[col_index][old_value].remove(rid)
+                #if not self.table.index.indices[col_index][old_value]:  # this removes empty lsits
+                    #del self.table.index.indices[col_index][old_value]
+    
+    
+    
         # Create a new version of the record
         new_rid = self.rid_counter
         self.rid_counter += 1
         timestamp = int(time())
         schema_encoding = int(''.join(['1' if col is not None else '0' for col in columns]), 2)
-        indirection = 0  # SET IT TO FUCKING 0 AAAAAAAAAAAA
-
-        # Convert into a full record format
-        new_record = [indirection, new_rid, timestamp, schema_encoding] + updated_values
-
-        # print("New record:", new_record)
-
+    
         # Find available location to write the new version
         page_range = self.table.page_ranges[page_range_num]
-
-        if not page_range.tail_pages:
-            # print("creating a tail page")
-            page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))
-
-
-        tailpage = page_range.tail_pages[-1]
-        page = tailpage.pages[-1]
-        # for page in tailpage.pages:
-        if page.has_capacity()==False:
-            # print(f"phys page is full, creating new page")
-            page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))
-
-        # if not (page.pages[-1].has_capacity() for page in page_range.tail_pages):
-        #     print("Adding new tail page")
-        #     print(f"curr tail page num = {len(page_range.tail_pages)}")
-        #     new_tail_page = PageGroup(num_columns=self.table.num_columns)
-        #     page_range.tail_pages.append(new_tail_page)
-        
-
-
-        # if not page_range.tail_pages or not page_range.tail_pages[-1].pages[0].has_capacity():
-        #     # print("Adding new tail page")
-        #     page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))
-
-        # Last tail page and the slot in that page for the new record
-        # tail_page = page_range.tail_pages[-1]
-        # tail_record_num = tail_page.pages[0].num_records
-        # print("DEBUG: type of page_range.tail_pages[-1] =", type(page_range.tail_pages[-1]))
-
-        page_range = self.table.page_ranges[page_range_num]
-        tail_page_group = page_range.tail_pages[-1]
-        # print(f"new tail page num = {len(page_range.tail_pages)}")
-        tail_record_num = tail_page_group.pages[-1].num_records
-        # print(f"new tail record num = {tail_record_num}")
-
-        # print("Writing new version to tail page at record number:", tail_record_num)
-
-        # Write the new version
-        tail_page_group.write(*new_record, record_number=tail_record_num)
-
-        # Update page directory for the new version
-        self.table.page_directory[new_rid] = (page_range_num, len(page_range.tail_pages) - 1, tail_record_num)
-
-        # Update the indirection column of the base record to point to the new version
-
-        # print(f"DEBUG: Updating base record at {record_num} with new indirection RID: {new_rid}")
-        # print(f"DEBUG: Previous indirection RID: {base_page.pages[config.INDIRECTION_COLUMN].read(record_num)}")
-        # base_page.pages[config.INDIRECTION_COLUMN].write(new_rid, record_num)
-        offset_number = record_num * config.VALUE_SIZE
-        base_page.pages[config.INDIRECTION_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = new_rid.to_bytes(config.VALUE_SIZE, byteorder='little')
-        
-        # print(f"DEBUG: New indirection RID set: {base_page.pages[config.INDIRECTION_COLUMN].read(record_num)}")
-
-
-        # print("Update successful")
-        return True
     
+        #originally: has_capacity cheked [-1] but if .tailpages is empty that coul've been causing index error
+        if not page_range.tail_pages or page_range.tail_pages[-1].pages[0].is_full():
+            # If there are no tail pages/last tail page is full---create a new one
+            page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))  
+    
+        # ^but doesn't loop through all pages, here we are assuming updates are creted sequntially
+        
+        
+        #optional w has capacity-
+        #if not page_range.tail_pages:
+        #page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))  
+        #tail_page_group = page_range.tail_pages[-1]
+        #page = tail_page_group.pages[-1]
+        #if not page.has_capacity():  
+        #page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))  
+    
+    
+        tail_page_group = page_range.tail_pages[-1]
+        tail_record_num = tail_page_group.pages[-1].num_records
+    
+        # indirection correctly for version tracking
+        if latest_rid == rid:  
+            # First update -> link to Base Page
+            indirection = rid  
+        else:  
+            # Next next updates -> link to previous Tail Page
+            indirection = latest_rid  
+    
+        # Insert the new version into the Tail Page
+        new_record = [indirection, new_rid, timestamp, schema_encoding] + updated_values
+        tail_page_group.write(*new_record, record_number=tail_record_num)
+    
+        # Update Page Directory for the new tail version
+        self.table.page_directory[new_rid] = (page_range_num, len(page_range.tail_pages) - 1, tail_record_num)
+    
+        # Update the indirection column of the base record ONLYYYY if it was the first update
+        if latest_rid == rid:
+            base_page.pages[config.INDIRECTION_COLUMN].write(new_rid, record_num)
+        
+        # uhhhh adds updated values to the index if they are indexed columns
+        #for col_index in range(self.table.num_columns):
+            #if columns[col_index] is not None and col_index in self.table.index.indices:
+                #new_value = updated_values[col_index]
+                #self.table.index.addRecord(new_value, new_rid, col_index)
+    
+    
+        return True  # Update successful
+
     """
     :param start_range: int         # Start of the key range to aggregate 
     :param end_range: int           # End of the key range to aggregate 
