@@ -3,52 +3,61 @@ A data strucutre holding indices for various columns of a table. Key column shou
 """
 
 from collections import defaultdict
-from lstore import config
+import config
 
 class Index:
 
-    def __init__(self, table):
+    def __init__(self):
         # the index is a dictionary of dictionaries
         self.indices = defaultdict(lambda: None)
         # each dictionary in the index dictionary contains the index of its row
         self.indices[config.PRIMARY_KEY_COLUMN] = defaultdict(lambda: None)
 
-    """
-    # returns the location of all records with the given value on column "column"
-    """
+    '''
+    Add new record entry to index
+    '''
+    def addRecord(self, key, RID, key_col=config.PRIMARY_KEY_COLUMN):
+        if key_col not in self.indices:
+            print(f"no index exists for column {key_col}")
+            return
+        if key not in self.indices[key_col]:
+            self.indices[key_col][key] = [RID]
+        else:
+            self.indices[key_col][key].append(RID)
 
-    def locate(self, column, value):
-        if column not in self.indices or self.indices[column] is None:
-            print(f"no index exists for column {column}")
+    """
+    # returns list of RIDs of all records with the given value on column "column"
+    """
+    def locate(self, key_val:int, key_col=config.PRIMARY_KEY_COLUMN):
+        if key_col not in self.indices or self.indices[key_col] is None:
+            print(f"no index exists for column {key_col}")
             return [] # [] ensures function always returns an iterable
         else:
-            return self.indices[column].get(value, []) # If value is not found, return an empty list instead of None
+            return self.indices[key_col].get(key_val, []) # If value is not found, return an empty list instead of None
 
 
     """
-    # Returns the RIDs of all records with values in column "column" between "begin" and "end"
+    # Returns list of RIDs of all records with values in column "column" between "begin" and "end"
     """
-
-    def locate_range(self, begin, end, column):
-        if self.indices[column] == None:
+    def locate_range(self, begin:int, end:int, key_col=config.PRIMARY_KEY_COLUMN):
+        if self.indices == None:
             print("error: this column is not indexed")
             return []
 
-        if begin>end: # ensure that begin is smaller than end
+        if begin > end: # ensure that begin is smaller than end
             begin, end = end, begin
 
-        rid_list = []
+        all_rids = []
         for key in range(begin, end+1):
-            value = self.indices[column].get(key, None)  # Use `.get()` to prevent `KeyError`
-            if value is not None:
-                rid_list.append(value)
+            rids = self.indices[key_col].get(key, None)  # Use `.get()` to prevent `KeyError`
+            if rids is not None:
+                all_rids.extend(rids)
         
-        return rid_list
+        return all_rids
 
     """
     # optional: Create index on specific column
     """
-
     def create_index(self, column_number):
         if self.indices[column_number] is not None:
             print(f"column with number {column_number} already exists")
@@ -61,7 +70,6 @@ class Index:
     """
     # optional: Drop index of specific column
     """
-
     def drop_index(self, column_number):
         if column_number == config.PRIMARY_KEY_COLUMN:
             print("error: cant drop primary key index")
