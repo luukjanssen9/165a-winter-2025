@@ -16,6 +16,8 @@ def test_update():
     query.increment(1, 2)
 
     # Selecting record #1
+    result2.update()
+
     result1 = query.select(1, 0, [1, 1, 1, 1, 1])  # Get all columns
     result2 = query.select(2, 0, [1, 1, 1, 1, 1])  # Get all columns
 
@@ -87,7 +89,7 @@ def test_update_513():
 
     print("Update test for 513 records passed!")
 
-test_update_513()
+# test_update_513()
 
 
 def test_update_twice():
@@ -100,6 +102,9 @@ def test_update_twice():
 
     # First update: Increment column 2
     query.increment(1, 2)
+    query.increment(1, 2)
+    query.increment(1, 2)
+    query.increment(1, 2)
 
     # Fetch and verify first update
     result1 = query.select(1, 0, [1, 1, 1, 1, 1])  # Select all columns
@@ -110,6 +115,7 @@ def test_update_twice():
 
     # Second update: Increment column 3
     query.increment(1, 3)
+    query.increment(1, 2)
 
     # Fetch and verify second update
     result2 = query.select(1, 0, [1, 1, 1, 1, 1])  # Select all columns

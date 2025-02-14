@@ -35,9 +35,9 @@ def test_delete():
     # if the record was deleted, then the results should be uhhh idk
     
     # DEBUG, to see what the select returns:
-    print(f"rid: {result1[0].rid}")
-    print(f"key: {result1[0].key}")
-    print(f"cols: {result1[0].columns}")
+    print(f"rid: {result2[0].rid}")
+    print(f"key: {result2[0].key}")
+    print(f"cols: {result2[0].columns}")
     
     # assert result2 is False, "Incorrect delete output"
     if result2==False: print(f"\npassed")

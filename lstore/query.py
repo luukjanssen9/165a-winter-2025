@@ -167,7 +167,7 @@ class Query:
             if rid_list is None:
                 return False
             rid = rid_list[0]
-            print(f"rid is {rid}")
+            # print(f"rid is {rid}")
             # # Use page directory for fast lookup if searching by primary key
             # rid = None
             # for rid_key, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
@@ -274,46 +274,51 @@ class Query:
     """
     def update(self, primary_key, *columns):
         # print("Starting update function")
-        rid = None # set to none to check for matching
-        for rid_key, (page_range_num, base_page_num, record_num) in self.table.page_directory.items(): #searcing directory to find record
-            stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[config.PRIMARY_KEY_COLUMN].read(record_num)
-            
-            # get the RID
-            current_rid = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[config.RID_COLUMN].read(record_num)
+        
+        # need RID to get base and tail pages
+        rid_list = self.table.index.indices[config.PRIMARY_KEY_COLUMN][primary_key]
+        if rid_list is None:
+            return False
+        rid = rid_list[0]
+        # print(f"rid is {rid}")
 
-            # only lets it through if the RID wasnt deleted
-            if ((stored_primary_key == primary_key) and (current_rid!=0)): # if matching found fix rid
-                rid = rid_key
-                break
+        record = self.select(primary_key, 0, [1] * self.table.num_columns)
     
-        if rid is None: # no match -> update fails
+        # print(f"record is: {record[0].columns}")
+
+        if record is None: # no match -> update fails
             # print("No matching record found")
             return False  
     
 
-        # Locate the record in the page directory using RID
+        # # Locate the record in the page directory using RID
         page_range_num, base_page_num, record_num = self.table.page_directory[rid]
         base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
+        base_page_indirection = base_page.pages[config.INDIRECTION_COLUMN].read(record_num) 
 
-        # Follow indirection pointer to get the latest version
-        current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_num) 
-        base_page_indirection = current_rid
-        latest_version = (base_page, record_num)
+        # # Follow indirection pointer to get the latest version
+        # current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_num) 
+        # base_page_indirection = current_rid
+        # latest_version = (base_page, record_num)
 
-        while current_rid != 0 and current_rid in self.table.page_directory:
-            tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
-            tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
-            latest_version = (tail_page, tail_record_num)  # Update latest version
-            current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)  # Move to the next older version
+        # while current_rid != 0 and current_rid in self.table.page_directory:
+        #     tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
+        #     tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
+        #     latest_version = (tail_page, tail_record_num)  # Update latest version
+        #     current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)  # Move to the next older version
 
-        # Read the final/latest version of the record
-        version_page, version_record_num = latest_version
-        stored_values = [version_page.pages[i + 4].read(version_record_num) for i in range(self.table.num_columns)]
-        stored_primary_key = base_page.pages[4].read(record_num)
+        # # Read the final/latest version of the record
+        # version_page, version_record_num = latest_version
+        # stored_values = [version_page.pages[i + 4].read(version_record_num) for i in range(self.table.num_columns)]
+        # stored_primary_key = base_page.pages[4].read(record_num)
 
 
+
+        stored_values = record[0].columns
         # Get the current values of the record
         updated_values = [columns[i] if columns[i] is not None else stored_values[i] for i in range(self.table.num_columns)]
+        # print(f"updated is: {updated_values}")
+        
         # might be num cols -1
 
         # print("Current values:", stored_values)
@@ -325,9 +330,7 @@ class Query:
         timestamp = int(time())
         schema_encoding = int(''.join(['1' if col is not None else '0' for col in columns]), 2)
         # print(f"base indir is {base_page_indirection}, latest indir is {current_rid}, new rid is {new_rid}")
-        if base_page_indirection != current_rid: # if this is false, then there was an indirection before and we want to link to that
-            indirection = base_page_indirection
-        else: indirection = 0  # SET IT TO FUCKING 0 AAAAAAAAAAAA
+        indirection = base_page_indirection
 
         # Convert into a full record format
         new_record = [indirection, new_rid, timestamp, schema_encoding] + updated_values
@@ -366,10 +369,12 @@ class Query:
         # tail_record_num = tail_page.pages[0].num_records
         # print("DEBUG: type of page_range.tail_pages[-1] =", type(page_range.tail_pages[-1]))
 
+
+        # run this line again to ensure that you have the most up to date range, in case a new page range was created
         page_range = self.table.page_ranges[page_range_num]
         tail_page_group = page_range.tail_pages[-1]
-        # print(f"new tail page num = {len(page_range.tail_pages)}")
         tail_record_num = tail_page_group.pages[-1].num_records
+        # print(f"new tail page num = {len(page_range.tail_pages)}")
         # print(f"new tail record num = {tail_record_num}")
 
         # print("Writing new version to tail page at record number:", tail_record_num)
