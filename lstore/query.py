@@ -13,7 +13,7 @@ class Query:
     Any query that crashes (due to exceptions) should return False
     """
     def __init__(self, table):
-        self.table = table
+        self.table:Table = table
         self.rid_counter = 1 # counter to keep track of the number of records in the table
     
     """
@@ -125,7 +125,9 @@ class Query:
         # Update page directory for hash table
         self.table.page_directory[rid] = (page_range_number, base_page_number, record_number)
 
-        # TODO: Implement indexing
+        # Update index
+        self.table.index.addRecord(primary_key, rid)
+
         return True
 
    
@@ -449,9 +451,12 @@ class Query:
         if(start_range > end_range):
             start_range, end_range = end_range, start_range
 
-        sum = 0
-        range_not_empty = False
+        # get rids of all matching records
+        rids = self.table.index.locate_range(start_range,end_range)
+        if (len(rids) == 0):
+            return False
         
+        sum = 0        
         for key in range(start_range, end_range+1):
             # same line from the increment function
             row = self.select(key, self.table.key, [1] * self.table.num_columns)
