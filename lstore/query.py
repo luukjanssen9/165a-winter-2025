@@ -23,6 +23,11 @@ class Query:
     # Return False if record doesn't exist or is locked due to 2PL
     """
     def delete(self, primary_key):
+        rid_list = self.table.index.indices[config.PRIMARY_KEY_COLUMN][primary_key]
+        if rid_list is None:
+            return False
+        rid = rid_list[0]
+
         # loop through all records to find the correct one
         for page_range in self.table.page_ranges:
             for base_page in page_range.base_pages:
@@ -158,8 +163,6 @@ class Query:
     def select_version(self, search_key, search_key_index, projected_columns_index, relative_version):
         # fix relative version by taking absolute value
         # relative_version = abs(relative_version)
-
-        # TODO: do we use search_key_index?
         records = []
 
         if search_key_index == self.table.key:
@@ -231,11 +234,24 @@ class Query:
             stored_values = [version_page.pages[i + 5].read(version_record_num) for i in range(self.table.num_columns - 1)]
             stored_primary_key = base_page.pages[config.PRIMARY_KEY_COLUMN].read(record_num)
 
+            if relative_version==-2:
+                version_page2, version_record_num2 = versions[-2]
+                version_page1, version_record_num1 = versions[-1]
+                version_page0, version_record_num0 = versions[0]
+                stored2 = [version_page2.pages[i + 5].read(version_record_num2) for i in range(self.table.num_columns - 1)]
+                stored1 = [version_page1.pages[i + 5].read(version_record_num1) for i in range(self.table.num_columns - 1)]
+                stored0 = [version_page0.pages[i + 5].read(version_record_num0) for i in range(self.table.num_columns - 1)]
+                # print(f"\nrel ver   = {relative_version}")
+                # print(f"stored -2 = {stored2}")
+                # print(f"stored -1 = {stored1}")
+                # print(f"stored  0 = {stored0}")
+
             # Apply column projection
             projected_values = [stored_primary_key] + [
                 stored_values[i] if projected_columns_index[i + 1] else None for i in range(self.table.num_columns - 1)
             ]
-            records.append(Record(search_key, search_key, projected_values))
+            records.append(Record(version_record_num, search_key, projected_values))
+            # records.append(Record(search_key, search_key, projected_values))
 
         else:
             # Use the index to find all matching RIDs instead of scanning everything
