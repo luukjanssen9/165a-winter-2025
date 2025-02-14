@@ -100,14 +100,19 @@ class Query:
         # Validate column count and prevent insertion if column count does not match
         if len(columns) != self.table.num_columns:
             return False  
+        
 
         primary_key = columns[self.table.key]  # Get primary key value
-
+        # print(primary_key)
         # Check if primary key already exists
-        for rid, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
-            stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[4].read(record_num)
-            if stored_primary_key == primary_key:
-                return False  # Prevent duplicate insertion
+        if primary_key in self.table.index.indices[config.PRIMARY_KEY_COLUMN]:
+            return False  # Prevent duplicate insertion
+
+
+        # for rid, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
+        #     stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[4].read(record_num)
+        #     if stored_primary_key == primary_key:
+        #         return False  # Prevent duplicate insertion
         
         # Generate metadata
         rid = self.rid_counter
