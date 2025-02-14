@@ -49,7 +49,10 @@ class Query:
                                 tail_page.pages[config.TIMESTAMP_COLUMN].write(0, tail_record_num)
 
                                 current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)  # Move to the next older version
-                            
+
+                            # update index
+                            self.table.index.indices[config.PRIMARY_KEY_COLUMN].pop(primary_key, None)
+
                             return True            
             # if we reach here, the record does not exist
             return False
@@ -125,7 +128,8 @@ class Query:
         # Update page directory for hash table
         self.table.page_directory[rid] = (page_range_number, base_page_number, record_number)
 
-        # TODO: Implement indexing
+        # Add to index if applicable
+        self.table.index.indices[config.PRIMARY_KEY_COLUMN][primary_key] = [rid]
         return True
 
    
@@ -163,20 +167,11 @@ class Query:
 
         if search_key_index == self.table.key:
             # Use page directory for fast lookup if searching by primary key
-            rid = None
-            for rid_key, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
-                stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[config.PRIMARY_KEY_COLUMN].read(record_num)                
-                
-                # gets the RID
-                get_RID = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[config.RID_COLUMN].read(record_num)
+            rid_list = self.table.index.locate(config.PRIMARY_KEY_COLUMN, search_key)
+            if not rid_list:
+                return False  # Record not found
 
-                # only lets it through if the RID wasnt deleted
-                if ((stored_primary_key == search_key) and (get_RID!=0)):
-                    rid = rid_key
-                    break
-
-            if rid is None:
-                return False 
+            rid = rid_list[0]  # Assuming a single primary key maps to one record
 
             # Locate the record in the page directory using RID
             page_range_num, base_page_num, record_num = self.table.page_directory[rid]
@@ -390,7 +385,8 @@ class Query:
         #   
         # print(f"DEBUG: New indirection RID set: {base_page.pages[config.INDIRECTION_COLUMN].read(record_num)}")
 
-
+        # update index
+        self.table.index.indices[config.PRIMARY_KEY_COLUMN][primary_key] = [new_rid]
         # print("Update successful")
         return True
     
