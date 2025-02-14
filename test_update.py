@@ -16,7 +16,7 @@ def test_update():
     query.increment(1, 2)
 
     # Selecting record #1
-    result2.update()
+    # result2.update()
 
     result1 = query.select(1, 0, [1, 1, 1, 1, 1])  # Get all columns
     result2 = query.select(2, 0, [1, 1, 1, 1, 1])  # Get all columns

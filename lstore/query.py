@@ -23,42 +23,33 @@ class Query:
     # Return False if record doesn't exist or is locked due to 2PL
     """
     def delete(self, primary_key):
-        ...
-        # # loop through all records to find the correct one
-        # for page_range in self.table.page_ranges:
-        #     for base_page in page_range.base_pages:
-        #         for page in range(0, len(base_page.pages)):
-        #             for record_number in range(0, base_page.pages[page].num_records): 
-                        
-        #                 # check if the record primary key is the same as the one we want to delete
-        #                 if base_page.pages[config.PRIMARY_KEY_COLUMN].read(record_number) == primary_key: #5th column is the primary key
-                            
-        #                     # Follow indirection pointer to get the latest tail page version
-        #                     current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_number) 
-                            
-        #                     # then delete the RID and timestamp
-        #                     base_page.pages[config.RID_COLUMN].write(0, record_number) # set base page RID to 0
-        #                     base_page.pages[config.TIMESTAMP_COLUMN].write(0, record_number) # set the timestamp to 0 as well
+        rid_list = self.table.index.indices[config.PRIMARY_KEY_COLUMN][primary_key]
+        if rid_list is None:
+            return False
+        rid = rid_list[0]
 
-        #                     while current_rid != 0 and current_rid in self.table.page_directory:
-        #                         # use the RID to get the next tail page and record
-        #                         tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
-        #                         tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
+        page_range_num, base_page_num, record_num = self.table.page_directory[rid]
+        base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
 
-        #                         # to delete all tail page records along the way.
-        #                         tail_page.pages[config.RID_COLUMN].write(0, tail_record_num)
-        #                         tail_page.pages[config.TIMESTAMP_COLUMN].write(0, tail_record_num)
+        # # Follow indirection pointer to get the latest version
+        # current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_num) 
+        
+        # base_page.pages[config.RID_COLUMN].write(0, record_num) # set base page RID to 0
+        # base_page.pages[config.TIMESTAMP_COLUMN].write(0, record_num) # set the timestamp to 0 as well
+        # base_page.pages[config.INDIRECTION_COLUMN].write(0, record_num) # set the indirection to 0 too
+        
+        # then delete the RID, timestamp, and indirection
+        zeroed = 0
+        offset_number = record_num * config.VALUE_SIZE
+        base_page.pages[config.RID_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
+        base_page.pages[config.TIMESTAMP_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
+        base_page.pages[config.INDIRECTION_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
+        
+        self.table.index.indices[config.PRIMARY_KEY_COLUMN][primary_key] = [None]
 
-        #                         current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)  # Move to the next older version
-                            
-        #                     return True            
-        #     # if we reach here, the record does not exist
-        #     return False
+        # print(f"successfully deleted")
 
-        # rid = self.table.index.indices[primary_key][0]
-        # page_range, base_page, record_num = self.table.page_directory[rid]
-        # self.table.page_ranges[page_range].
-
+        return True            
     
     # is this function ever used? we might be able to remove it.
     def get_vals(self, rid):
@@ -162,8 +153,6 @@ class Query:
     def select_version(self, search_key, search_key_index, projected_columns_index, relative_version):
         # fix relative version by taking absolute value
         # relative_version = abs(relative_version)
-
-        # TODO: do we use search_key_index?
         records = []
 
         if search_key_index == self.table.key:
@@ -184,8 +173,8 @@ class Query:
             #     if ((stored_primary_key == search_key) and (get_RID!=0)):
             #         rid = rid_key
             #         break
-
-            if rid is None:
+            # print(f"rid is {rid}")
+            if rid is None or rid==0:
                 return False 
 
             # Locate the record in the page directory using RID
@@ -235,11 +224,24 @@ class Query:
             stored_values = [version_page.pages[i + 5].read(version_record_num) for i in range(self.table.num_columns - 1)]
             stored_primary_key = base_page.pages[config.PRIMARY_KEY_COLUMN].read(record_num)
 
+            if relative_version==-2:
+                version_page2, version_record_num2 = versions[-2]
+                version_page1, version_record_num1 = versions[-1]
+                version_page0, version_record_num0 = versions[0]
+                stored2 = [version_page2.pages[i + 5].read(version_record_num2) for i in range(self.table.num_columns - 1)]
+                stored1 = [version_page1.pages[i + 5].read(version_record_num1) for i in range(self.table.num_columns - 1)]
+                stored0 = [version_page0.pages[i + 5].read(version_record_num0) for i in range(self.table.num_columns - 1)]
+                # print(f"\nrel ver   = {relative_version}")
+                # print(f"stored -2 = {stored2}")
+                # print(f"stored -1 = {stored1}")
+                # print(f"stored  0 = {stored0}")
+
             # Apply column projection
             projected_values = [stored_primary_key] + [
                 stored_values[i] if projected_columns_index[i + 1] else None for i in range(self.table.num_columns - 1)
             ]
-            records.append(Record(search_key, search_key, projected_values))
+            records.append(Record(version_record_num, search_key, projected_values))
+            # records.append(Record(search_key, search_key, projected_values))
 
         else:
             # Use the index to find all matching RIDs instead of scanning everything
