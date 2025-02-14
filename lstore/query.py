@@ -13,7 +13,7 @@ class Query:
     Any query that crashes (due to exceptions) should return False
     """
     def __init__(self, table):
-        self.table = table
+        self.table:Table = table
         self.rid_counter = 1 # counter to keep track of the number of records in the table
     
     """
@@ -125,7 +125,8 @@ class Query:
         # Update page directory for hash table
         self.table.page_directory[rid] = (page_range_number, base_page_number, record_number)
 
-        # TODO: Implement indexing
+        # Update index
+        self.table.index.addRecord(primary_key, rid)
         return True
 
    
@@ -162,18 +163,23 @@ class Query:
         records = []
 
         if search_key_index == self.table.key:
-            # Use page directory for fast lookup if searching by primary key
-            rid = None
-            for rid_key, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
-                stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[config.PRIMARY_KEY_COLUMN].read(record_num)                
+            rid_list = self.table.index.indices[config.PRIMARY_KEY_COLUMN][search_key]
+            if rid_list is None:
+                return False
+            rid = rid_list[0]
+            print(f"rid is {rid}")
+            # # Use page directory for fast lookup if searching by primary key
+            # rid = None
+            # for rid_key, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
+            #     stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[config.PRIMARY_KEY_COLUMN].read(record_num)                
                 
-                # gets the RID
-                get_RID = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[config.RID_COLUMN].read(record_num)
+            #     # gets the RID
+            #     get_RID = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[config.RID_COLUMN].read(record_num)
 
-                # only lets it through if the RID wasnt deleted
-                if ((stored_primary_key == search_key) and (get_RID!=0)):
-                    rid = rid_key
-                    break
+            #     # only lets it through if the RID wasnt deleted
+            #     if ((stored_primary_key == search_key) and (get_RID!=0)):
+            #         rid = rid_key
+            #         break
 
             if rid is None:
                 return False 
