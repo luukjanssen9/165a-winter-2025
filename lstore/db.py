@@ -26,8 +26,7 @@ class Database():
                 print(f"error: A table with the name \"{table.name}\" already exists")
                 return None
         self.tables.append(newTable)
-        return table
-        
+        return newTable
 
     
     """
@@ -36,7 +35,7 @@ class Database():
     def drop_table(self, name):
         for table in self.tables:
             if table.name==name:
-                del table
+                self.tables.remove(table)  
                 return
         print(f"error: No table with the name \"{name}\" exists")
     

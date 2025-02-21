@@ -49,6 +49,7 @@ for key in records:
     else:
         pass
         # print('select on', key, ':', record)
+print("Select finished")
 
 updated_records = {}
 for key in records:
@@ -69,7 +70,7 @@ for key in records:
         if column != records[key][j]:
             error = True
     if error:
-        print('update error on', records[key], 'and', updated_columns, ':', record, ', correct:', records[key])
+        print('update error on -1:', records[key], 'and', updated_columns, ':', record.columns, ', correct:', records[key])
     else:
         pass
         # print('update on', original, 'and', updated_columns, ':', record)
@@ -81,8 +82,10 @@ for key in records:
         if column != records[key][j]:
             error = True
     if error:
-        print('update error on', records[key], 'and', updated_columns, ':', record, ', correct:', records[key])
+        print('update error on -2:', records[key], 'and', updated_columns, ':', record.columns, ', correct:', records[key])
+        pass
     else:
+        print(f"\n\n\n\n\n\n\n\n\n\n\n-2 passing: {records[key]} == {record.columns}")
         pass
         # print('update on', original, 'and', updated_columns, ':', record)
     
@@ -93,7 +96,9 @@ for key in records:
         if column != updated_records[key][j]:
             error = True
     if error:
-        print('update error on', records[key], 'and', updated_columns, ':', record, ', correct:', updated_records[key])
+        print('update error on 0:', records[key], 'and', updated_columns, ':', record.columns, ', correct:', updated_records[key])
+print("Update finished")
+# exit(1)
 
 keys = sorted(list(records.keys()))
 # aggregate on every column 
@@ -102,24 +107,30 @@ for c in range(0, grades_table.num_columns):
         r = sorted(sample(range(0, len(keys)), 2))
         # calculate the sum form test directory
         # version -1 sum
+        # print(f"sum -1")
         column_sum = sum(map(lambda key: records[key][c], keys[r[0]: r[1] + 1]))
         result = query.sum_version(keys[r[0]], keys[r[1]], c, -1)
         if column_sum != result:
-            print('sum error on [', keys[r[0]], ',', keys[r[1]], ']: ', result, ', correct: ', column_sum)
+            print('sum error on [', keys[r[0]], ',', keys[r[1]], ']: ', result, ', correct: ', column_sum, "ver = -1")
         else:
+            # print("passing")
             pass
             # print('sum on [', keys[r[0]], ',', keys[r[1]], ']: ', column_sum)
         # version -2 sum
         column_sum = sum(map(lambda key: records[key][c], keys[r[0]: r[1] + 1]))
+        # print(f"sum -2")
         result = query.sum_version(keys[r[0]], keys[r[1]], c, -2)
         if column_sum != result:
-            print('sum error on [', keys[r[0]], ',', keys[r[1]], ']: ', result, ', correct: ', column_sum)
+            print('sum error on [', keys[r[0]], ',', keys[r[1]], ']: ', result, ', correct: ', column_sum, "ver = -2")
         else:
+            # print("-2 passing")
             pass
         # version 0 sum
         updated_column_sum = sum(map(lambda key: updated_records[key][c], keys[r[0]: r[1] + 1]))
         updated_result = query.sum_version(keys[r[0]], keys[r[1]], c, 0)
         if updated_column_sum != updated_result:
-            print('sum error on [', keys[r[0]], ',', keys[r[1]], ']: ', updated_result, ', correct: ', updated_column_sum)
+            print('sum error on [', keys[r[0]], ',', keys[r[1]], ']: ', updated_result, ', correct: ', updated_column_sum, "ver = 0")
         else:
+            # print("passing")
             pass
+print("Sum finished")
