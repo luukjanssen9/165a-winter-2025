@@ -14,7 +14,8 @@ class Query:
     """
     def __init__(self, table):
         self.table:Table = table
-        self.rid_counter = 1 # counter to keep track of the number of records in the table
+        # counter to keep track of the number of records in the table
+        self.rid_counter = 1 
     
     """
     # internal Method
@@ -23,11 +24,13 @@ class Query:
     # Return False if record doesn't exist or is locked due to 2PL
     """
     def delete(self, primary_key):
+        # Retrieve all the RIDs that match the primary key from the index
         rid_list = self.table.index.indices[config.PRIMARY_KEY_COLUMN][primary_key]
         if rid_list is None:
             return False
         rid = rid_list[0]
 
+        # Locate the record in the page directory using the first RID (the most up to date version)
         page_range_num, base_page_num, record_num = self.table.page_directory[rid]
         base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
         
@@ -38,6 +41,7 @@ class Query:
         base_page.pages[config.TIMESTAMP_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
         base_page.pages[config.INDIRECTION_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
         
+        # Update the index to remove the primary key
         self.table.index.indices[config.PRIMARY_KEY_COLUMN][primary_key] = [None]
 
         return True            
@@ -67,8 +71,8 @@ class Query:
         rid = self.rid_counter
         self.rid_counter += 1
         schema_encoding = int('0' * self.table.num_columns, 2) 
-        timestamp = int(time())  # Store current timestamp
-        indirection = 0 # initially set to 0
+        timestamp = int(time())  
+        indirection = 0 
         
         # Convert into a full record format
         record = [indirection, rid, timestamp, schema_encoding] + list(columns)
