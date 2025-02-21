@@ -167,16 +167,18 @@ class Query:
 
                 tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
                 tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
-
+                # if tail_page!=base_page and tail_record_num!=record_num:
+                
                 if first_traverse:
                     versions.insert(0, (tail_page, tail_record_num)) # update version
                     first_traverse = False
                 else: versions.insert(2, (tail_page, tail_record_num)) # update version
 
                 current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)  # Move to the next older version
-
+                
             version_page, version_record_num = versions[relative_version]
-            
+
+            # Read the final/latest version of the record
             stored_values = [version_page.pages[i + 5].read(version_record_num) for i in range(self.table.num_columns - 1)]
             stored_primary_key = base_page.pages[config.PRIMARY_KEY_COLUMN].read(record_num)
 
@@ -188,21 +190,27 @@ class Query:
         else:
             # Use the index to find all matching RIDs instead of scanning everything
             rid_list = self.table.index.locate(search_key_index, search_key)
+
             if not rid_list:
                 return False  # No records found
+            
             for rid in rid_list:
                 if rid not in self.table.page_directory:
                     continue  # Skip invalid entries
+
                 page_range_num, base_page_num, record_num = self.table.page_directory[rid]
                 base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
+
                 # Follow indirection to get the latest version
                 current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_num)
                 latest_version = (base_page, record_num)
+
                 while current_rid != 0 and current_rid in self.table.page_directory:
                     tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
                     tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
                     latest_version = (tail_page, tail_record_num)
                     current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)
+
                 # Read the final/latest version of the record
                 version_page, version_record_num = latest_version
                 stored_values = [version_page.pages[i + 5].read(version_record_num) for i in range(self.table.num_columns - 1)]
@@ -268,7 +276,7 @@ class Query:
         page_range = self.table.page_ranges[page_range_num]
         tail_page_group = page_range.tail_pages[-1]
         tail_record_num = tail_page_group.pages[-1].num_records
-        
+
         # Write the new version
         tail_page_group.write(*new_record, record_number=tail_record_num)
 
@@ -279,7 +287,6 @@ class Query:
         offset_number = record_num * config.VALUE_SIZE
         base_page.pages[config.INDIRECTION_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = new_rid.to_bytes(config.VALUE_SIZE, byteorder='little')
 
-        # update successful
         return True
     
     """
