@@ -33,8 +33,8 @@ class Query:
         # Locate the record in the page directory using the first RID (the most up to date version)
         page_range_num, base_page_num, record_num = self.table.page_directory[rid]
         base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
-        
-        # then delete the RID, timestamp, and indirection
+
+        # Set the indirection, RID, and Timestam column of the base record to 0 to mark it as deleted
         zeroed = 0
         offset_number = record_num * config.VALUE_SIZE
         base_page.pages[config.RID_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
@@ -44,14 +44,10 @@ class Query:
         # Update the index to remove the primary key
         self.table.index.indices[config.PRIMARY_KEY_COLUMN][primary_key] = [None]
 
-        return True            
-        
-    # # is this function ever used? we might be able to remove it.
-    # def get_vals(self, rid):
-    #     if rid in self.table.page_directory:
-    #         return self.table.page_directory[rid]
-    #     return None  # Handle missing RID properly
+        # print(f"successfully deleted")
 
+        return True            
+    
     """
     # Insert a record with specified columns
     # Return True upon succesful insertion
@@ -62,7 +58,8 @@ class Query:
         if len(columns) != self.table.num_columns:
             return False  
         
-        primary_key = columns[self.table.key]  # Get primary key value
+        # Get primary key value from record
+        primary_key = columns[self.table.key]  
         # Check if primary key already exists
         if primary_key in self.table.index.indices[config.PRIMARY_KEY_COLUMN]:
             return False  # Prevent duplicate insertion
@@ -83,9 +80,13 @@ class Query:
         # Iterate over page ranges to find a base page with capacity
         for pr_num, page_range in enumerate(self.table.page_ranges):
             for bp_num, base_page in enumerate(page_range.base_pages):
+                # print(f"Checking capacity for Page Range {pr_num}, Base Page {bp_num}: {base_page.has_capacity()}")
                 if base_page.has_capacity():
                     page_range_number, base_page_number = pr_num, bp_num
                     record_number = base_page.pages[0].num_records  # Use next available slot
+                    
+                    # DEBUG: Print the page range, base page, and record number
+                    # print(f"using {pr_num}, {bp_num}, {record_number}")
                     break
             if page_range_number is not None:
                 break
@@ -114,6 +115,7 @@ class Query:
         self.table.index.addRecord(primary_key, rid)
         return True
 
+   
     
     """
     # Read matching record with specified search key
@@ -161,9 +163,8 @@ class Query:
 
             first_traverse = True
             # replace with a for loop that runs relative_version times
-            for i in range(0, abs(relative_version)):
-                if current_rid==0 or current_rid not in self.table.page_directory:
-                    break 
+            while current_rid != 0 and current_rid in self.table.page_directory:
+                prev_rid = current_rid # hold the last RID, 
 
                 tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
                 tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
@@ -173,6 +174,7 @@ class Query:
                     versions.insert(0, (tail_page, tail_record_num)) # update version
                     first_traverse = False
                 else: versions.insert(2, (tail_page, tail_record_num)) # update version
+
 
                 current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)  # Move to the next older version
                 
@@ -187,6 +189,8 @@ class Query:
                 stored_values[i] if projected_columns_index[i + 1] else None for i in range(self.table.num_columns - 1)
             ]
             records.append(Record(version_record_num, search_key, projected_values))
+            # records.append(Record(search_key, search_key, projected_values))
+
         else:
             # Use the index to find all matching RIDs instead of scanning everything
             rid_list = self.table.index.locate(search_key_index, search_key)
@@ -229,14 +233,21 @@ class Query:
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
     def update(self, primary_key, *columns):
+        # print("Starting update function")
+        
         # need RID to get base and tail pages
         rid_list = self.table.index.indices[config.PRIMARY_KEY_COLUMN][primary_key]
         if rid_list is None:
             return False
         rid = rid_list[0]
+        # print(f"rid is {rid}")
 
         record = self.select(primary_key, 0, [1] * self.table.num_columns)
+    
+        # print(f"record is: {record[0].columns}")
+
         if record is None: # no match -> update fails
+            # print("No matching record found")
             return False  
     
 
@@ -254,6 +265,7 @@ class Query:
         self.rid_counter += 1
         timestamp = int(time())
         schema_encoding = int(''.join(['1' if col is not None else '0' for col in columns]), 2)
+        # print(f"base indir is {base_page_indirection}, latest indir is {current_rid}, new rid is {new_rid}")
         indirection = base_page_indirection
 
         # Convert into a full record format
@@ -270,6 +282,7 @@ class Query:
         page = tailpage.pages[-1]
         # for page in tailpage.pages:
         if page.has_capacity()==False:
+            # print(f"phys page is full, creating new page")
             page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))
 
         # run this line again to ensure that you have the most up to date range, in case a new page range was created
