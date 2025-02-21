@@ -14,7 +14,8 @@ class Query:
     """
     def __init__(self, table):
         self.table:Table = table
-        self.rid_counter = 1 # counter to keep track of the number of records in the table
+        # counter to keep track of the number of records in the table
+        self.rid_counter = 1 
     
     """
     # internal Method
@@ -23,40 +24,30 @@ class Query:
     # Return False if record doesn't exist or is locked due to 2PL
     """
     def delete(self, primary_key):
+        # Retrieve all the RIDs that match the primary key from the index
         rid_list = self.table.index.indices[config.PRIMARY_KEY_COLUMN][primary_key]
         if rid_list is None:
             return False
         rid = rid_list[0]
 
+        # Locate the record in the page directory using the first RID (the most up to date version)
         page_range_num, base_page_num, record_num = self.table.page_directory[rid]
         base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
 
-        # # Follow indirection pointer to get the latest version
-        # current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_num) 
-        
-        # base_page.pages[config.RID_COLUMN].write(0, record_num) # set base page RID to 0
-        # base_page.pages[config.TIMESTAMP_COLUMN].write(0, record_num) # set the timestamp to 0 as well
-        # base_page.pages[config.INDIRECTION_COLUMN].write(0, record_num) # set the indirection to 0 too
-        
-        # then delete the RID, timestamp, and indirection
+        # Set the indirection, RID, and Timestam column of the base record to 0 to mark it as deleted
         zeroed = 0
         offset_number = record_num * config.VALUE_SIZE
         base_page.pages[config.RID_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
         base_page.pages[config.TIMESTAMP_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
         base_page.pages[config.INDIRECTION_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
         
+        # Update the index to remove the primary key
         self.table.index.indices[config.PRIMARY_KEY_COLUMN][primary_key] = [None]
 
         # print(f"successfully deleted")
 
         return True            
     
-    # is this function ever used? we might be able to remove it.
-    def get_vals(self, rid):
-        if rid in self.table.page_directory:
-            return self.table.page_directory[rid]
-        return None  # Handle missing RID properly
-
     """
     # Insert a record with specified columns
     # Return True upon succesful insertion
@@ -67,8 +58,8 @@ class Query:
         if len(columns) != self.table.num_columns:
             return False  
         
-
-        primary_key = columns[self.table.key]  # Get primary key value
+        # Get primary key value from record
+        primary_key = columns[self.table.key]  
         # Check if primary key already exists
         if primary_key in self.table.index.indices[config.PRIMARY_KEY_COLUMN]:
             return False  # Prevent duplicate insertion
@@ -77,8 +68,8 @@ class Query:
         rid = self.rid_counter
         self.rid_counter += 1
         schema_encoding = int('0' * self.table.num_columns, 2) 
-        timestamp = int(time())  # Store current timestamp
-        indirection = 0 # initially set to 0
+        timestamp = int(time())  
+        indirection = 0 
         
         # Convert into a full record format
         record = [indirection, rid, timestamp, schema_encoding] + list(columns)
