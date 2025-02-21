@@ -65,8 +65,8 @@ class PageGroup():
 class pageRange():
     def __init__(self, num_columns):
         # contains an array of PageGroup (base pages)
-        # contains an array of PageGroup (tail pages)
         self.base_pages = []
+        # contains an array of PageGroup (tail pages)
         self.tail_pages = []
         for i in range(config.PAGE_RANGE_SIZE):
             self.base_pages.append(PageGroup(num_columns))
