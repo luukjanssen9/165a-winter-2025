@@ -144,7 +144,9 @@ class Query:
     def select_version(self, search_key, search_key_index, projected_columns_index, relative_version):
         records = []
 
+        # If the search hey is the primary key, we can use the index to find the record
         if search_key_index == self.table.key:
+            # Get the RID of the record
             rid_list = self.table.index.indices[config.PRIMARY_KEY_COLUMN][search_key]
             if rid_list is None:
                 return False
@@ -192,6 +194,7 @@ class Query:
             # records.append(Record(search_key, search_key, projected_values))
 
         else:
+            print("test")
             # Use the index to find all matching RIDs instead of scanning everything
             rid_list = self.table.index.locate(search_key_index, search_key)
 
