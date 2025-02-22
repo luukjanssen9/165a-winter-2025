@@ -5,7 +5,7 @@ class Database():
 
     def __init__(self):
         self.tables = []
-        self.bufferpool = Bufferpool()
+        self.bufferpool = Bufferpool() # Shouldnt this line be in the open function?
 
     # Not required for milestone1
     def open(self, path):
@@ -13,7 +13,9 @@ class Database():
         pass
 
     def close(self):
-        # remove bufferpool, write anything thats dirty
+        # Loop through bufferpool and write all dirty pages to disk
+
+        # remove bufferpool
         pass
 
     """
