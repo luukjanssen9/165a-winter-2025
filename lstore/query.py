@@ -177,7 +177,10 @@ class Query:
 
 
                 current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)  # Move to the next older version
-                
+            
+            if len(versions) == abs(relative_version):
+                relative_version += 1
+
             version_page, version_record_num = versions[relative_version]
 
             # Read the final/latest version of the record

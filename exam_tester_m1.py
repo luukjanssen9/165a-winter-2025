@@ -85,7 +85,6 @@ for key in records:
         print('update error on -2:', records[key], 'and', updated_columns, ':', record.columns, ', correct:', records[key])
         pass
     else:
-        print(f"\n\n\n\n\n\n\n\n\n\n\n-2 passing: {records[key]} == {record.columns}")
         pass
         # print('update on', original, 'and', updated_columns, ':', record)
     
