@@ -2,16 +2,17 @@ from lstore import config
 # BUFFERPOOL CLASS
 class Bufferpool:
 
-    def __init__(self):
+    def __init__(self, max_size):
         # We need to keep track of the size since the data is stored in a bytearray
         self.size = 0
+        self.max_size = max_size
         # Each bufferpool has a list of base and tail pages (initially empty)
         self.pageGroups = []
-        for i in range(config.BUFFERPOOL_MAX_LENGTH):
+        for i in range(max_size):
             self.pageGroups.append(None)
 
     def hasCapacity(self):
-        if self.size<config.BUFFERPOOL_MAX_LENGTH:
+        if self.size<self.max_size:
             return True
         else: return False
 

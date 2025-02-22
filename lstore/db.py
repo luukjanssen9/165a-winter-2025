@@ -1,11 +1,12 @@
 from lstore.table import Table
 from lstore.bufferpool import Bufferpool
+from lstore import config
 
 class Database():
 
     def __init__(self):
         self.tables = []
-        self.bufferpool = Bufferpool() # Shouldnt this line be in the open function?
+        self.bufferpool = Bufferpool(config.BUFFERPOOL_MAX_LENGTH) # Shouldnt this line be in the open function?
 
     # Not required for milestone1
     def open(self, path):
