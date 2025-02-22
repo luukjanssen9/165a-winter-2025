@@ -23,7 +23,7 @@ class Bufferpool:
         # check if the pageGroup is already in bufferpool
         for pageGroup in self.database.bufferpool:
             # return the pageGroup if it is already in bufferpool
-            if RID == pageGroup.pages[config.RID_COLUMN].read(record_num): #idk if this is correct
+            if RID == pageGroup.pages[config.RID_COLUMN].read(record_num): # Check to make sure that this is correct
                 pageGroup.pinned = True
                 pageGroup.pins+=1
                 return pageGroup
@@ -37,6 +37,8 @@ class Bufferpool:
         # read the page from disk
         pageGroup = self.readFromDisk(RID, record_num)
         self.add(pageGroup)
+
+        # Should we unpin the page here??
         return pageGroup
 
     # Make space for a new page in the bufferpool
