@@ -1,16 +1,19 @@
 from lstore.table import Table
+from lstore.bufferpool import Bufferpool
 
 class Database():
 
     def __init__(self):
         self.tables = []
-        pass
+        self.bufferpool = Bufferpool()
 
     # Not required for milestone1
     def open(self, path):
+        # create bufferpool
         pass
 
     def close(self):
+        # remove bufferpool, write anything thats dirty
         pass
 
     """
