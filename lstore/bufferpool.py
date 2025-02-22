@@ -4,8 +4,8 @@ class Frame:
     def __init__(self):
         self.empty = True
         self.page = None
-        self.pinned = False
-        self.pins = 0
+        self.curr_pins = 0
+        self.total_pins = 0
         self.dirty = False
 
 # BUFFERPOOL CLASS
@@ -26,15 +26,14 @@ class Bufferpool:
         else: return False
 
     # if we use this function, then we need to know the RID and record num from the page dir
-    def getBufferpoolPage(self, RID, column_number):
+    def getBufferpoolPage(self, RID, column_number, tableindex):
         # check if the page is already in bufferpool
         for frame in self.frames:
-            # return the pageGroup if it is already in bufferpool
+            # return the page if it is already in bufferpool
 
             # do the col and RID match
-
-                    # pageGroup.pages[config.RID_COLUMN].read(record_num): # Check to make sure that this is correct
-            if RID == frame.page.read(record_num): # Check to make sure that this is correct
+            if RID in tableindex.indices[column_number].values():
+            # if RID == frame.page.read(column_number): # Check to make sure that this is correct
                 frame.pinned = True
                 frame.pins+=1
                 return frame
@@ -48,7 +47,7 @@ class Bufferpool:
             self.purge()
 
         # read the page from disk
-        page = self.readFromDisk(RID, record_num)
+        page = self.readFromDisk(RID, column_number, tableindex)
         if self.add(frame)==False:
             print("error, buffer pool has no space despite capacity check passing")
             return False
@@ -58,51 +57,59 @@ class Bufferpool:
     # Make space for a new page in the bufferpool
     def purge(self):
         # Iterate through the bufferpool to find the page with the least number of pins
-        leastPinnedIndex = 0
-        leastPinnedPins = self.pageGroups[0].pins
-        for i in range(0, self.pageGroups):
-            if leastPinnedPins > self.pageGroups[i].pins:
-                leastPinnedIndex = i
+        leastPinnedI = 0
+        leastPinnedPins = self.frames[0].total_pins
+        for i in range(0, self.frames):
+            if leastPinnedPins > self.frames[i].total_pins:
+                leastPinnedI = i
 
         # Evict the page with the least number of pins
-        self.evict(leastPinnedIndex)
+        self.evict(leastPinnedI)
         return True
     
     # Evict a page from the bufferpool
-    def evict(self, index):
+    def evict(self, i):
+        # return false if the frame is pinned
+        if self.frames[i].curr_pins != 0:
+            return False
+
         #Write the page to disk if it is dirty
-        if self.pageGroups[index].dirty:
-            self.writeToDisk(index) # might be bufferpool[index]
+        if self.frames[i].dirty:
+            self.writeToDisk(i) # might be bufferpool[i]
         
-        self.pageGroups.remove(index)
+        self.pageGroups.remove(i)
 
     # Add a pageGroup to the bufferpool
-    def add(self, pageGroup):
+    def add(self, page):
         if self.hasCapacity:
-            # Find and open spot in the bufferpool and add the pageGroup
-            for group in self.pageGroups:
-                if group == None:
-                    group = pageGroup
+            # Find and open spot in the bufferpool and add the page
+            for frame in self.frames:
+                if frame.page == None:
+                    frame.page = page
                     self.size += 1
                     return True
+                # else: continue
         else: return False
     
-    # Remove a pageGroup from the bufferpool
+    # Remove a page from the bufferpool
     def remove(self, index):
-        self.pageGroups[index] = None
+        self.frames[index].page = None
         self.size -= 1
         return True
     
-    def readFromDisk(self, RID, record_num):
-        # uses rid_column from config and RID to find the page to read
-        # if RID == pageGroup.pages[config.RID_COLUMN].read(record_num): #idk if this is correct
-
-
-
-
-
+    def readFromDisk(self, RID, column_number, tableindex):
+    
         # you have the RID and record_num. use page directory to get the page group and page range. then read them from disk
         # return the page group
+
+
+        #
+        # MAKE SURE YOU CREATE AN INDEX FOR THE PAGE
+        #
+        # index.indices[column_number] = something like index.create_index()
+
+
+        # add to the buffer pool with self.add()
         pass
     
     def writeToDisk(self, index):
