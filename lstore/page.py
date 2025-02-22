@@ -5,6 +5,9 @@ class Page:
     def __init__(self):
         self.num_records = 0
         self.data = bytearray(config.ARRAY_SIZE)
+        self.pinned = False
+        self.pins = 0
+        self.dirty = False
 
     def has_capacity(self):
         if self.num_records < int(config.ARRAY_SIZE/config.VALUE_SIZE):
@@ -36,8 +39,9 @@ class Page:
 
 # BASE AND TAIL PAGE CLASS
 class PageGroup():
-    def __init__(self, num_columns):
+    def __init__(self, num_columns, type=config.TAIL_PAGE):
         self.pages = []
+        self.type = type
         # Initialize pages for each column upfront
         for _ in range(num_columns+4):
             self.pages.append(Page())
@@ -65,11 +69,11 @@ class PageGroup():
 class pageRange():
     def __init__(self, num_columns):
         # contains an array of PageGroup (base pages)
-        # contains an array of PageGroup (tail pages)
         self.base_pages = []
+        # contains an array of PageGroup (tail pages)
         self.tail_pages = []
         for i in range(config.PAGE_RANGE_SIZE):
-            self.base_pages.append(PageGroup(num_columns))
+            self.base_pages.append(PageGroup(num_columns, type=config.BASE_PAGE))
     
     def has_capacity(self):
         for base_page in self.base_pages:

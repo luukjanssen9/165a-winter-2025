@@ -1,5 +1,6 @@
+from lstore.db import Database
 def test_create_table():
-    from lstore.db import Database
+    # from lstore.db import Database
     db = Database()
     
     # Create a table
@@ -12,7 +13,7 @@ def test_create_table():
     assert table.key == 0, "Primary key index mismatch"
 
 def test_get_table():
-    from lstore.db import Database
+    # from lstore.db import Database
     db = Database()
     
     db.create_table("Grades", 4, 1)
@@ -22,7 +23,7 @@ def test_get_table():
     assert table.name == "Grades", "Table name mismatch"
 
 def test_drop_table():
-    from lstore.db import Database
+    # from lstore.db import Database
     db = Database()
     
     db.create_table("Tests", 3, 1)
