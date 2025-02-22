@@ -1,13 +1,10 @@
 from lstore import config
-from lstore.db import Database
 # BUFFERPOOL CLASS
 class Bufferpool:
 
-    def __init__(self, database):
+    def __init__(self):
         # We need to keep track of the size since the data is stored in a bytearray
         self.size = 0
-        # One bufferpool per database
-        self.database:Database = database
         # Each bufferpool has a list of base and tail pages (initially empty)
         self.pageGroups = []
         for i in range(config.BUFFERPOOL_MAX_LENGTH):
@@ -21,7 +18,7 @@ class Bufferpool:
     # if we use this function, then we need to know the RID and record num from the page dir
     def getBufferpoolPage(self, RID, record_num):
         # check if the pageGroup is already in bufferpool
-        for pageGroup in self.database.bufferpool:
+        for pageGroup in self.pageGroups:
             # return the pageGroup if it is already in bufferpool
             if RID == pageGroup.pages[config.RID_COLUMN].read(record_num): # Check to make sure that this is correct
                 pageGroup.pinned = True
@@ -45,9 +42,9 @@ class Bufferpool:
     def purge(self):
         # Iterate through the bufferpool to find the page with the least number of pins
         leastPinnedIndex = 0
-        leastPinnedPins = self.database.bufferpool[0].pins
-        for i in range(0, self.database.bufferpool):
-            if leastPinnedPins > self.database.bufferpool[i].pins:
+        leastPinnedPins = self.pageGroups[0].pins
+        for i in range(0, self.pageGroups):
+            if leastPinnedPins > self.pageGroups[i].pins:
                 leastPinnedIndex = i
 
         # Evict the page with the least number of pins
@@ -57,10 +54,10 @@ class Bufferpool:
     # Evict a page from the bufferpool
     def evict(self, index):
         #Write the page to disk if it is dirty
-        if self.database.bufferpool[index].dirty:
+        if self.pageGroups[index].dirty:
             self.writeToDisk(index) # might be bufferpool[index]
         
-        self.database.bufferpool.remove(index)
+        self.pageGroups.remove(index)
 
     # Add a pageGroup to the bufferpool
     def add(self, pageGroup):
