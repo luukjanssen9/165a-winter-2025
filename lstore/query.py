@@ -14,7 +14,8 @@ class Query:
     """
     def __init__(self, table):
         self.table:Table = table
-        self.rid_counter = 1 # counter to keep track of the number of records in the table
+        # counter to keep track of the number of records in the table
+        self.rid_counter = 1 
     
     """
     # internal Method
@@ -23,40 +24,30 @@ class Query:
     # Return False if record doesn't exist or is locked due to 2PL
     """
     def delete(self, primary_key):
+        # Retrieve all the RIDs that match the primary key from the index
         rid_list = self.table.index.indices[config.PRIMARY_KEY_COLUMN][primary_key]
         if rid_list is None:
             return False
         rid = rid_list[0]
 
+        # Locate the record in the page directory using the first RID (the most up to date version)
         page_range_num, base_page_num, record_num = self.table.page_directory[rid]
         base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
 
-        # # Follow indirection pointer to get the latest version
-        # current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_num) 
-        
-        # base_page.pages[config.RID_COLUMN].write(0, record_num) # set base page RID to 0
-        # base_page.pages[config.TIMESTAMP_COLUMN].write(0, record_num) # set the timestamp to 0 as well
-        # base_page.pages[config.INDIRECTION_COLUMN].write(0, record_num) # set the indirection to 0 too
-        
-        # then delete the RID, timestamp, and indirection
+        # Set the indirection, RID, and Timestam column of the base record to 0 to mark it as deleted
         zeroed = 0
         offset_number = record_num * config.VALUE_SIZE
         base_page.pages[config.RID_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
         base_page.pages[config.TIMESTAMP_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
         base_page.pages[config.INDIRECTION_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
         
+        # Update the index to remove the primary key
         self.table.index.indices[config.PRIMARY_KEY_COLUMN][primary_key] = [None]
 
         # print(f"successfully deleted")
 
         return True            
     
-    # is this function ever used? we might be able to remove it.
-    def get_vals(self, rid):
-        if rid in self.table.page_directory:
-            return self.table.page_directory[rid]
-        return None  # Handle missing RID properly
-
     """
     # Insert a record with specified columns
     # Return True upon succesful insertion
@@ -67,8 +58,8 @@ class Query:
         if len(columns) != self.table.num_columns:
             return False  
         
-
-        primary_key = columns[self.table.key]  # Get primary key value
+        # Get primary key value from record
+        primary_key = columns[self.table.key]  
         # Check if primary key already exists
         if primary_key in self.table.index.indices[config.PRIMARY_KEY_COLUMN]:
             return False  # Prevent duplicate insertion
@@ -77,8 +68,8 @@ class Query:
         rid = self.rid_counter
         self.rid_counter += 1
         schema_encoding = int('0' * self.table.num_columns, 2) 
-        timestamp = int(time())  # Store current timestamp
-        indirection = 0 # initially set to 0
+        timestamp = int(time())  
+        indirection = 0 
         
         # Convert into a full record format
         record = [indirection, rid, timestamp, schema_encoding] + list(columns)
@@ -151,29 +142,16 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
     def select_version(self, search_key, search_key_index, projected_columns_index, relative_version):
-        # fix relative version by taking absolute value
-        # relative_version = abs(relative_version)
         records = []
 
+        # If the search hey is the primary key, we can use the index to find the record
         if search_key_index == self.table.key:
+            # Get the RID of the record
             rid_list = self.table.index.indices[config.PRIMARY_KEY_COLUMN][search_key]
             if rid_list is None:
                 return False
             rid = rid_list[0]
-            # print(f"rid is {rid}")
-            # # Use page directory for fast lookup if searching by primary key
-            # rid = None
-            # for rid_key, (page_range_num, base_page_num, record_num) in self.table.page_directory.items():
-            #     stored_primary_key = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[config.PRIMARY_KEY_COLUMN].read(record_num)                
-                
-            #     # gets the RID
-            #     get_RID = self.table.page_ranges[page_range_num].base_pages[base_page_num].pages[config.RID_COLUMN].read(record_num)
 
-            #     # only lets it through if the RID wasnt deleted
-            #     if ((stored_primary_key == search_key) and (get_RID!=0)):
-            #         rid = rid_key
-            #         break
-            # print(f"rid is {rid}")
             if rid is None or rid==0:
                 return False 
 
@@ -193,7 +171,7 @@ class Query:
                 tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
                 tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
                 # if tail_page!=base_page and tail_record_num!=record_num:
-                # print(f"\ninserting new version: {tail_page}, {tail_record_num}")
+                
                 if first_traverse:
                     versions.insert(0, (tail_page, tail_record_num)) # update version
                     first_traverse = False
@@ -201,40 +179,12 @@ class Query:
 
 
                 current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)  # Move to the next older version
-                # print(f"indirection of {prev_rid} is {current_rid}")
-
-            # print(f"versions: {versions[0][1]}, {versions[-1][1]}")
-            # print(f"versions len: {len(versions)}")
-
-            # Retrieve the Correct Version
-            # if relative_version  0:
-            #     # Retrieve the specified past version
-            #     # print(f"relative version is {relative_version}, should be negative, length of versions is {len(versions)}")
-            #     version_page, version_record_num = versions[relative_version]
-            # print(f"rel ver: {relative_version}, len ver: {len(versions)}")
+                
             version_page, version_record_num = versions[relative_version]
-            # else:
-            #     print(f"error: relative ver > 0")
-            #     # # Retrieve the specified past version
-            #     # print(f"relative version is {relative_version}, should be pos, length of versions is {len(versions)}")
-            #     # version_page, version_record_num = versions[len(versions)-relative_version]
 
             # Read the final/latest version of the record
-            # version_page, version_record_num = latest_version
             stored_values = [version_page.pages[i + 5].read(version_record_num) for i in range(self.table.num_columns - 1)]
             stored_primary_key = base_page.pages[config.PRIMARY_KEY_COLUMN].read(record_num)
-
-            if relative_version==-2:
-                version_page2, version_record_num2 = versions[-2]
-                version_page1, version_record_num1 = versions[-1]
-                version_page0, version_record_num0 = versions[0]
-                stored2 = [version_page2.pages[i + 5].read(version_record_num2) for i in range(self.table.num_columns - 1)]
-                stored1 = [version_page1.pages[i + 5].read(version_record_num1) for i in range(self.table.num_columns - 1)]
-                stored0 = [version_page0.pages[i + 5].read(version_record_num0) for i in range(self.table.num_columns - 1)]
-                # print(f"\nrel ver   = {relative_version}")
-                # print(f"stored -2 = {stored2}")
-                # print(f"stored -1 = {stored1}")
-                # print(f"stored  0 = {stored0}")
 
             # Apply column projection
             projected_values = [stored_primary_key] + [
@@ -244,23 +194,30 @@ class Query:
             # records.append(Record(search_key, search_key, projected_values))
 
         else:
+            print("test")
             # Use the index to find all matching RIDs instead of scanning everything
             rid_list = self.table.index.locate(search_key_index, search_key)
+
             if not rid_list:
                 return False  # No records found
+            
             for rid in rid_list:
                 if rid not in self.table.page_directory:
                     continue  # Skip invalid entries
+
                 page_range_num, base_page_num, record_num = self.table.page_directory[rid]
                 base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
+
                 # Follow indirection to get the latest version
                 current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_num)
                 latest_version = (base_page, record_num)
+
                 while current_rid != 0 and current_rid in self.table.page_directory:
                     tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
                     tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
                     latest_version = (tail_page, tail_record_num)
                     current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)
+
                 # Read the final/latest version of the record
                 version_page, version_record_num = latest_version
                 stored_values = [version_page.pages[i + 5].read(version_record_num) for i in range(self.table.num_columns - 1)]
@@ -302,33 +259,9 @@ class Query:
         base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
         base_page_indirection = base_page.pages[config.INDIRECTION_COLUMN].read(record_num) 
 
-        # # Follow indirection pointer to get the latest version
-        # current_rid = base_page.pages[config.INDIRECTION_COLUMN].read(record_num) 
-        # base_page_indirection = current_rid
-        # latest_version = (base_page, record_num)
-
-        # while current_rid != 0 and current_rid in self.table.page_directory:
-        #     tail_page_range, tail_base_page, tail_record_num = self.table.page_directory[current_rid]
-        #     tail_page = self.table.page_ranges[tail_page_range].tail_pages[tail_base_page]
-        #     latest_version = (tail_page, tail_record_num)  # Update latest version
-        #     current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)  # Move to the next older version
-
-        # # Read the final/latest version of the record
-        # version_page, version_record_num = latest_version
-        # stored_values = [version_page.pages[i + 4].read(version_record_num) for i in range(self.table.num_columns)]
-        # stored_primary_key = base_page.pages[4].read(record_num)
-
-
-
         stored_values = record[0].columns
         # Get the current values of the record
         updated_values = [columns[i] if columns[i] is not None else stored_values[i] for i in range(self.table.num_columns)]
-        # print(f"updated is: {updated_values}")
-        
-        # might be num cols -1
-
-        # print("Current values:", stored_values)
-        # print("Updated values:", updated_values)
 
         # Create a new version of the record
         new_rid = self.rid_counter
@@ -341,15 +274,12 @@ class Query:
         # Convert into a full record format
         new_record = [indirection, new_rid, timestamp, schema_encoding] + updated_values
 
-        # print("New record:", new_record)
-
         # Find available location to write the new version
         page_range = self.table.page_ranges[page_range_num]
 
         if not page_range.tail_pages:
             # print("creating a tail page")
             page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))
-
 
         tailpage = page_range.tail_pages[-1]
         page = tailpage.pages[-1]
@@ -358,32 +288,10 @@ class Query:
             # print(f"phys page is full, creating new page")
             page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))
 
-        # if not (page.pages[-1].has_capacity() for page in page_range.tail_pages):
-        #     print("Adding new tail page")
-        #     print(f"curr tail page num = {len(page_range.tail_pages)}")
-        #     new_tail_page = PageGroup(num_columns=self.table.num_columns)
-        #     page_range.tail_pages.append(new_tail_page)
-        
-
-
-        # if not page_range.tail_pages or not page_range.tail_pages[-1].pages[0].has_capacity():
-        #     # print("Adding new tail page")
-        #     page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))
-
-        # Last tail page and the slot in that page for the new record
-        # tail_page = page_range.tail_pages[-1]
-        # tail_record_num = tail_page.pages[0].num_records
-        # print("DEBUG: type of page_range.tail_pages[-1] =", type(page_range.tail_pages[-1]))
-
-
         # run this line again to ensure that you have the most up to date range, in case a new page range was created
         page_range = self.table.page_ranges[page_range_num]
         tail_page_group = page_range.tail_pages[-1]
         tail_record_num = tail_page_group.pages[-1].num_records
-        # print(f"new tail page num = {len(page_range.tail_pages)}")
-        # print(f"new tail record num = {tail_record_num}")
-
-        # print("Writing new version to tail page at record number:", tail_record_num)
 
         # Write the new version
         tail_page_group.write(*new_record, record_number=tail_record_num)
@@ -392,23 +300,9 @@ class Query:
         self.table.page_directory[new_rid] = (page_range_num, len(page_range.tail_pages) - 1, tail_record_num)
 
         # Update the indirection column of the base record to point to the new version
-
-        # print(f"DEBUG: Updating base record at {record_num} with new indirection RID: {new_rid}")
-        # print(f"DEBUG: Previous indirection RID: {base_page.pages[config.INDIRECTION_COLUMN].read(record_num)}")
-        # base_page.pages[config.INDIRECTION_COLUMN].write(new_rid, record_num)
         offset_number = record_num * config.VALUE_SIZE
         base_page.pages[config.INDIRECTION_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = new_rid.to_bytes(config.VALUE_SIZE, byteorder='little')
 
-        # update tail page indirection to be the next tail page
-        # we grab the indirection of the base page
-        # we set the indirection of the new tail page to the indirection of the old tail page
-
-
-        #   
-        # print(f"DEBUG: New indirection RID set: {base_page.pages[config.INDIRECTION_COLUMN].read(record_num)}")
-
-
-        # print("Update successful")
         return True
     
     """
