@@ -31,7 +31,9 @@ class Bufferpool:
 
         # read the page from disk
         pageGroup = self.readFromDisk(RID, record_num)
-        self.add(pageGroup)
+        if self.add(pageGroup)==False:
+            print("error, buffer pool has no space despite capacity check passing")
+            return False
         return pageGroup
 
     def purge(self):
@@ -68,7 +70,12 @@ class Bufferpool:
         # uses rid_column from config and RID to find the page to read
         # if RID == pageGroup.pages[config.RID_COLUMN].read(record_num): #idk if this is correct
 
-        # should work similar to select, maybe always read the things required for index first then just use the index to find what u need
+
+
+
+
+        # you have the RID and record_num. use page directory to get the page group and page range. then read them from disk
+        # return the page group
         pass
     
     def writeToDisk(self, index):
