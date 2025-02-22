@@ -1,4 +1,11 @@
 from lstore import config
+
+class Frame:
+    def __init__(self):
+        self.page = None
+        self.dirty = False
+        self.empty = True
+        self.pins = 0
 # BUFFERPOOL CLASS
 class Bufferpool:
 
