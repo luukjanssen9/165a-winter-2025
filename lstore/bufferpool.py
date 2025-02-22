@@ -1,4 +1,13 @@
 from lstore import config
+# FRAME CLASS
+class Frame:
+    def __init__(self):
+        self.empty = True
+        self.page = None
+        self.pinned = False
+        self.pins = 0
+        self.dirty = False
+
 # BUFFERPOOL CLASS
 class Bufferpool:
 
@@ -7,9 +16,9 @@ class Bufferpool:
         self.size = 0
         self.max_size = max_size
         # Each bufferpool has a list of base and tail pages (initially empty)
-        self.pageGroups = []
+        self.frames = []
         for i in range(max_size):
-            self.pageGroups.append(None)
+            self.frames.append(None)
 
     def hasCapacity(self):
         if self.size<self.max_size:
@@ -17,28 +26,34 @@ class Bufferpool:
         else: return False
 
     # if we use this function, then we need to know the RID and record num from the page dir
-    def getBufferpoolPage(self, RID, record_num):
-        # check if the pageGroup is already in bufferpool
-        for pageGroup in self.pageGroups:
+    def getBufferpoolPage(self, RID, column_number):
+        # check if the page is already in bufferpool
+        for frame in self.frames:
             # return the pageGroup if it is already in bufferpool
-            if RID == pageGroup.pages[config.RID_COLUMN].read(record_num): # Check to make sure that this is correct
-                pageGroup.pinned = True
-                pageGroup.pins+=1
-                return pageGroup
+
+            # do the col and RID match
+
+                    # pageGroup.pages[config.RID_COLUMN].read(record_num): # Check to make sure that this is correct
+            if RID == frame.page.read(record_num): # Check to make sure that this is correct
+                frame.pinned = True
+                frame.pins+=1
+                return frame
         
+        #
         # if you make it this far, then the page is not in bufferpool
-    
+        #
+
         # check if bufferpool is full
         if self.hasCapacity==False:
             self.purge()
 
         # read the page from disk
-        pageGroup = self.readFromDisk(RID, record_num)
-        if self.add(pageGroup)==False:
+        page = self.readFromDisk(RID, record_num)
+        if self.add(frame)==False:
             print("error, buffer pool has no space despite capacity check passing")
             return False
         # Should we unpin the page here??
-        return pageGroup
+        return page
 
     # Make space for a new page in the bufferpool
     def purge(self):

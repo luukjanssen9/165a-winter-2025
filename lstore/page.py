@@ -5,9 +5,6 @@ class Page:
     def __init__(self):
         self.num_records = 0
         self.data = bytearray(config.ARRAY_SIZE)
-        self.pinned = False
-        self.pins = 0
-        self.dirty = False
 
     def has_capacity(self):
         if self.num_records < int(config.ARRAY_SIZE/config.VALUE_SIZE):
