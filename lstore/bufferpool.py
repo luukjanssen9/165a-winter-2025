@@ -4,8 +4,11 @@ from lstore.db import Database
 class Bufferpool:
 
     def __init__(self, database):
+        # We need to keep track of the size since the data is stored in a bytearray
         self.size = 0
+        # One bufferpool per database
         self.database:Database = database
+        # Each bufferpool has a list of base and tail pages (initially empty)
         self.pageGroups = []
         for i in range(config.BUFFERPOOL_MAX_LENGTH):
             self.pageGroups.append(None)
@@ -17,7 +20,9 @@ class Bufferpool:
 
     # if we use this function, then we need to know the RID and record num from the page dir
     def getBufferpoolPage(self, RID, record_num):
+        # check if the pageGroup is already in bufferpool
         for pageGroup in self.database.bufferpool:
+            # return the pageGroup if it is already in bufferpool
             if RID == pageGroup.pages[config.RID_COLUMN].read(record_num): #idk if this is correct
                 pageGroup.pinned = True
                 pageGroup.pins+=1
@@ -34,24 +39,31 @@ class Bufferpool:
         self.add(pageGroup)
         return pageGroup
 
+    # Make space for a new page in the bufferpool
     def purge(self):
+        # Iterate through the bufferpool to find the page with the least number of pins
         leastPinnedIndex = 0
         leastPinnedPins = self.database.bufferpool[0].pins
         for i in range(0, self.database.bufferpool):
             if leastPinnedPins > self.database.bufferpool[i].pins:
                 leastPinnedIndex = i
-    
+
+        # Evict the page with the least number of pins
         self.evict(leastPinnedIndex)
         return True
     
+    # Evict a page from the bufferpool
     def evict(self, index):
+        #Write the page to disk if it is dirty
         if self.database.bufferpool[index].dirty:
             self.writeToDisk(index) # might be bufferpool[index]
         
         self.database.bufferpool.remove(index)
 
+    # Add a pageGroup to the bufferpool
     def add(self, pageGroup):
         if self.hasCapacity:
+            # Find and open spot in the bufferpool and add the pageGroup
             for group in self.pageGroups:
                 if group == None:
                     group = pageGroup
@@ -59,6 +71,7 @@ class Bufferpool:
                     return True
         else: return False
     
+    # Remove a pageGroup from the bufferpool
     def remove(self, index):
         self.pageGroups[index] = None
         self.size -= 1
