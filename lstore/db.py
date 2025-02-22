@@ -1,16 +1,21 @@
 from lstore.table import Table
+from lstore.bufferpool import Bufferpool
 
 class Database():
 
     def __init__(self):
         self.tables = []
-        pass
+        self.bufferpool = Bufferpool() # Shouldnt this line be in the open function?
 
     # Not required for milestone1
     def open(self, path):
+        # create bufferpool
         pass
 
     def close(self):
+        # Loop through bufferpool and write all dirty pages to disk
+
+        # remove bufferpool
         pass
 
     """
