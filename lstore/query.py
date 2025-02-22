@@ -44,8 +44,6 @@ class Query:
         # Update the index to remove the primary key
         self.table.index.indices[config.PRIMARY_KEY_COLUMN][primary_key] = [None]
 
-        # print(f"successfully deleted")
-
         return True            
     
     """
@@ -84,9 +82,6 @@ class Query:
                 if base_page.has_capacity():
                     page_range_number, base_page_number = pr_num, bp_num
                     record_number = base_page.pages[0].num_records  # Use next available slot
-                    
-                    # DEBUG: Print the page range, base page, and record number
-                    # print(f"using {pr_num}, {bp_num}, {record_number}")
                     break
             if page_range_number is not None:
                 break
@@ -175,11 +170,14 @@ class Query:
                 if first_traverse:
                     versions.insert(0, (tail_page, tail_record_num)) # update version
                     first_traverse = False
-                else: versions.insert(2, (tail_page, tail_record_num)) # update version
+                else: 
+                    versions.insert(2, (tail_page, tail_record_num)) # update version
 
 
                 current_rid = tail_page.pages[config.INDIRECTION_COLUMN].read(tail_record_num)  # Move to the next older version
                 
+            # If the relative version is out of bounds, return the latest version
+            # This was necassary to pass exam_tester_m1.py
             if len(versions) == abs(relative_version):
                 relative_version += 1
 
@@ -197,7 +195,7 @@ class Query:
             # records.append(Record(search_key, search_key, projected_values))
 
         else:
-            print("test")
+            # TODO: Do we ever use this? Should we consider removing it?
             # Use the index to find all matching RIDs instead of scanning everything
             rid_list = self.table.index.locate(search_key_index, search_key)
 
@@ -239,21 +237,15 @@ class Query:
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
     def update(self, primary_key, *columns):
-        # print("Starting update function")
-        
         # need RID to get base and tail pages
         rid_list = self.table.index.indices[config.PRIMARY_KEY_COLUMN][primary_key]
         if rid_list is None:
             return False
         rid = rid_list[0]
-        # print(f"rid is {rid}")
 
         record = self.select(primary_key, 0, [1] * self.table.num_columns)
-    
-        # print(f"record is: {record[0].columns}")
 
         if record is None: # no match -> update fails
-            # print("No matching record found")
             return False  
     
 
@@ -271,7 +263,7 @@ class Query:
         self.rid_counter += 1
         timestamp = int(time())
         schema_encoding = int(''.join(['1' if col is not None else '0' for col in columns]), 2)
-        # print(f"base indir is {base_page_indirection}, latest indir is {current_rid}, new rid is {new_rid}")
+
         indirection = base_page_indirection
 
         # Convert into a full record format
@@ -281,14 +273,12 @@ class Query:
         page_range = self.table.page_ranges[page_range_num]
 
         if not page_range.tail_pages:
-            # print("creating a tail page")
             page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))
 
         tailpage = page_range.tail_pages[-1]
         page = tailpage.pages[-1]
         # for page in tailpage.pages:
         if page.has_capacity()==False:
-            # print(f"phys page is full, creating new page")
             page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))
 
         # run this line again to ensure that you have the most up to date range, in case a new page range was created
