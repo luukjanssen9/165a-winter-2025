@@ -7,7 +7,6 @@ class Frame:
         self.curr_pins = 0
         self.total_pins = 0
         self.dirty = False
-        self.pid = None # page id
 
 # BUFFERPOOL CLASS
 class Bufferpool:
