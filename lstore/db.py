@@ -51,12 +51,13 @@ class Database():
 
     def close(self):
         # TODO: Loop through bufferpool and write all dirty pages to disk
+        # TODO: write all table and page range metadata to disk
 
         # reset variables
         self.bufferpool = None
         self.isOpen = False
         self.path = None
-        pass
+        pass # TODO: should return True if successful
 
     """
     # Creates a new table
@@ -97,13 +98,14 @@ class Database():
         # check if database is open
         if not self.isOpen:
             print("error: Database is not open")
-            return
+            return False
         
         # TODO: delete file for table with associated files
         for table in self.tables:
             if table.name==name:
                 self.tables.remove(table)  
-                return
+                return True
+        # if you get this far without returning, then the table doesnt exist
         print(f"error: No table with the name \"{name}\" exists")
     
     """
