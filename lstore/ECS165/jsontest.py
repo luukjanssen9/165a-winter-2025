@@ -1,6 +1,10 @@
 import json
 import os
 
+currdir = "."
+for thing in os.listdir(currdir):
+    print(f"{thing}: {os.path.isdir(thing)}")
+
 path = "Grades"
 with open(f'{path}.json', 'r') as table_metadata:
     data = json.load(table_metadata)

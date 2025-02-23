@@ -29,21 +29,8 @@ class Database():
 
         # initialize tables into memory
         for table in os.listdir(path):
-            with open(f'{path}.json', 'r') as table_metadata:
-                data = json.load(table_metadata)
-            
-            # get data from the json
-            key = data["key"]
-            num_columns = data["num_columns"]
-            json_page_dir = data["page_directory"]
-
-            # properly format the page_dir using the json data
-            page_directory = {}
-            for i in json_page_dir:
-                page_directory[i] = (json_page_dir[i]['page_range'], json_page_dir[i]['base_page'], json_page_dir[i]['record_number'])
-            
-            # create the table with the data from disk, and add it to memory
-            self.tables.append(Table(key=key, num_columns=num_columns, page_directory=page_directory))
+            if os.path.isdir(table):
+                self.get_table(path)
 
         # create bufferpool
         self.bufferpool = Bufferpool(config.BUFFERPOOL_MAX_LENGTH) 
@@ -125,4 +112,22 @@ class Database():
         for table in self.tables:
             if table.name==name:
                 return table
-       
+            
+        # if you get this far, then the table isnt in memory yet. 
+        with open(f'{self.path}/{name}.json', 'r') as table_metadata:
+                data = json.load(table_metadata)
+            
+        # get data from the json
+        key = data["key"]
+        num_columns = data["num_columns"]
+        json_page_dir = data["page_directory"]  
+
+        # properly format the page_dir using the json data
+        page_directory = {}
+        for i in json_page_dir:
+            page_directory[i] = (json_page_dir[i]['page_range'], json_page_dir[i]['base_page'], json_page_dir[i]['record_number'])
+        
+        # create the table with the data from disk, and add it to memory
+        new_table = Table(key=key, num_columns=num_columns, page_directory=page_directory)
+        self.tables.append(new_table)
+        return new_table
