@@ -37,14 +37,19 @@ class Database():
         return True
 
     def close(self):
-        # TODO: Loop through bufferpool and write all dirty pages to disk
-        # TODO: write all table and page range metadata to disk
+        for frameNum in range(self.bufferpool.frames):
+            if self.bufferpool[frameNum].dirty:
+                self.bufferpool.writeToDisk(frameNum) # TODO: idk if this syntax is correct.
+        
+        # Close all tables (write metadata to disk)
+        for table in self.tables:
+            self.close_table(table)
 
         # reset variables
         self.bufferpool = None
         self.isOpen = False
         self.path = None
-        pass # TODO: should return True if successful
+        return True
 
     """
     # Creates a new table
@@ -66,7 +71,8 @@ class Database():
         os.mkdir(f"{self.path}/{name}")
 
         # TODO: Save table metadata to disk
-
+        # idk if we need this since we already write to disk on close
+        # self.write_table_metadata(table)
 
         # create table object
         newTable = Table(name, num_columns, key_index)
@@ -115,9 +121,10 @@ class Database():
             
         # if you get this far, then the table isnt in memory yet. 
         with open(f'{self.path}/{name}.json', 'r') as table_metadata:
-                data = json.load(table_metadata)
+            data = json.load(table_metadata)
             
         # get data from the json
+        name = data["name"]
         key = data["key"]
         num_columns = data["num_columns"]
         json_page_dir = data["page_directory"]  
@@ -128,6 +135,47 @@ class Database():
             page_directory[i] = (json_page_dir[i]['page_range'], json_page_dir[i]['base_page'], json_page_dir[i]['record_number'])
         
         # create the table with the data from disk, and add it to memory
-        new_table = Table(key=key, num_columns=num_columns, page_directory=page_directory)
+        new_table = Table(name=name, key=key, num_columns=num_columns, page_directory=page_directory)
         self.tables.append(new_table)
         return new_table
+    
+    """
+    # Close table with the passed name after writing its metadata to disk
+    """
+    def close_table(self, table):
+        if self.write_table_metadata(table):
+            # remove table from db
+            self.tables.remove(table.name)
+            return True
+        else: 
+            print("writing table to disk failed")
+            return False
+
+    """
+    # Write table metadata to disk
+    """
+    def write_table_metadata(self, table):
+         # get page directory dict
+        json_page_dir = {}
+        for i in table.page_directory:
+            json_page_dir[i] = {
+                    "page_range" : table.page_directory[i]['page_range'],
+                    "base_page" : table.page_directory[i]['base_page'],
+                    "record_number" : table.page_directory[i]['record_number']
+                }
+        
+        # create metadata dict
+        table_metadata = {
+            "name" : table.name,
+            "key" : table.key,
+            "num_columns" : table.num_columns,
+            "page_directory" : json_page_dir
+        }
+
+        # write metadata to disk
+        with open(f'{self.path}/{table.name}.json', 'w+') as json_output_file:
+            # if 0 bytes are written then it failed
+            if json_output_file.write(table_metadata)==0:
+                return False
+            # successful because something was written
+            else: return True
