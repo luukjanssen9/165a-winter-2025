@@ -32,6 +32,9 @@ class Query:
 
         # Locate the record in the page directory using the first RID (the most up to date version)
         page_range_num, base_page_num, record_num = self.table.page_directory[rid]
+        # TODO: Loop through the columns of the base page and check if each physical page is in the bufferpool
+        # TODO: If the page is not in the bufferpool, load it into the bufferpool
+        # TODO: do we write to disk here or is this part of the bufferpool?
         base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
 
         # Set the indirection, RID, and Timestam column of the base record to 0 to mark it as deleted
@@ -75,6 +78,8 @@ class Query:
         # Find available location to write to
         page_range_number, base_page_number, record_number = None, None, None
         
+        # TODO: Loop through bufferpool to find a page with capacity
+        # TODO: if bufferpool is full, find a page with capacity from disk
         # Iterate over page ranges to find a base page with capacity
         for pr_num, page_range in enumerate(self.table.page_ranges):
             for bp_num, base_page in enumerate(page_range.base_pages):
@@ -141,7 +146,6 @@ class Query:
         records = []
 
         # If the search hey is the primary key, we can use the index to find the record
-        print(self.table.key)
         if search_key_index == self.table.key:
             # Get the RID of the record
             rid_list = self.table.index.indices[config.PRIMARY_KEY_COLUMN][search_key]
@@ -197,7 +201,7 @@ class Query:
             # records.append(Record(search_key, search_key, projected_values))
 
         else:
-            # TODO: Do we ever use this? Should we consider removing it?
+            # TODO: We will be using this a lot of this milestone. Does it work? Should we update it?
             # Use the index to find all matching RIDs instead of scanning everything
             rid_list = self.table.index.locate(search_key_index, search_key)
 
