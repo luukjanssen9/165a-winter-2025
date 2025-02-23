@@ -10,6 +10,8 @@ class Database():
 
     # Not required for milestone1
     def open(self, path):
+        # create directory for database
+
         # create bufferpool
         pass
 
@@ -26,6 +28,7 @@ class Database():
     :param key: int             #Index of table key in columns
     """
     def create_table(self, name, num_columns, key_index):
+        # TODO: create directory for table with associated files
         newTable = Table(name, num_columns, key_index)
         for table in self.tables:
             if table.name == newTable.name:
@@ -39,6 +42,7 @@ class Database():
     # Deletes the specified table
     """
     def drop_table(self, name):
+        # TODO: delete directory for table with associated files
         for table in self.tables:
             if table.name==name:
                 self.tables.remove(table)  
@@ -49,6 +53,7 @@ class Database():
     # Returns table with the passed name
     """
     def get_table(self, name):
+        # TODO: return directory with the specified name 
         for table in self.tables:
             if table.name==name:
                 return table
