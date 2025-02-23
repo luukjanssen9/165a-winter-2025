@@ -14,6 +14,11 @@ class Database():
 
     # Not required for milestone1
     def open(self, path):
+        # check if database is already open
+        if self.isOpen:
+            print("error: Database is already open")
+            return
+        
         # create directory for database or if it already exists, open it
         if not os.path.exists(path):
             os.mkdir(path)
@@ -24,6 +29,8 @@ class Database():
         # initialize tables into memory
         for table in os.listdir(path):
             self.tables.append(Table()) # TODO: get metadata from disk
+
+        # TODO: load page_directory into memory
 
         # create bufferpool
         self.bufferpool = Bufferpool(config.BUFFERPOOL_MAX_LENGTH) 
@@ -45,6 +52,10 @@ class Database():
     :param key: int             #Index of table key in columns
     """
     def create_table(self, name, num_columns, key_index):
+        # check if database is open
+        if not self.isOpen:
+            print("error: Database is not open")
+            return None
         # check if table directory already exists
         if os.path.isdir(f"{self.path}/{name}"):
             print(f"error: A table with the name \"{name}\" already exists")
@@ -70,6 +81,11 @@ class Database():
     # Deletes the specified table
     """
     def drop_table(self, name):
+        # check if database is open
+        if not self.isOpen:
+            print("error: Database is not open")
+            return
+        
         # TODO: delete file for table with associated files
         for table in self.tables:
             if table.name==name:
@@ -81,6 +97,10 @@ class Database():
     # Returns table with the passed name
     """
     def get_table(self, name):
+        # check if database is open
+        if not self.isOpen:
+            print("error: Database is not open")
+            return None
         # check if table directory exists
         if not os.path.isdir(f"{self.path}/{name}"):
             # if it doesn't exist, there is an error
