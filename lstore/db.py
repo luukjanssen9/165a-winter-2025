@@ -21,6 +21,10 @@ class Database():
         # Save the path
         self.path = path
 
+        # initialize tables into memory
+        for table in os.listdir(path):
+            self.tables.append(Table()) # TODO: get metadata from disk
+
         # create bufferpool
         self.bufferpool = Bufferpool(config.BUFFERPOOL_MAX_LENGTH) 
         pass
@@ -41,7 +45,6 @@ class Database():
     :param key: int             #Index of table key in columns
     """
     def create_table(self, name, num_columns, key_index):
-        # TODO: create directory for table with associated files
         # check if table directory already exists
         if os.path.isdir(f"{self.path}/{name}"):
             print(f"error: A table with the name \"{name}\" already exists")
@@ -50,7 +53,10 @@ class Database():
         # create table directory
         os.mkdir(f"{self.path}/{name}")
 
-        # TODO: what do we do with table object?
+        # TODO: Save table metadata to disk
+
+
+        # create table object
         newTable = Table(name, num_columns, key_index)
         for table in self.tables:
             if table.name == newTable.name:
@@ -75,8 +81,13 @@ class Database():
     # Returns table with the passed name
     """
     def get_table(self, name):
-        # TODO: return file with the specified name 
+        # check if table directory exists
+        if not os.path.isdir(f"{self.path}/{name}"):
+            # if it doesn't exist, there is an error
+            print(f"error: No table with the name \"{name}\" exists")
+            return None
+        # return table object
         for table in self.tables:
             if table.name==name:
                 return table
-        print(f"error: No table with the name \"{name}\" exists")
+       

@@ -105,6 +105,7 @@ class Query:
 
         # Update page directory for hash table
         self.table.page_directory[rid] = (page_range_number, base_page_number, record_number)
+        # TODO: update metadata (page_directory) of table
 
         # Update index
         self.table.index.addRecord(primary_key, rid)
@@ -140,6 +141,7 @@ class Query:
         records = []
 
         # If the search hey is the primary key, we can use the index to find the record
+        print(self.table.key)
         if search_key_index == self.table.key:
             # Get the RID of the record
             rid_list = self.table.index.indices[config.PRIMARY_KEY_COLUMN][search_key]
