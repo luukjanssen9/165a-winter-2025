@@ -2,6 +2,7 @@ from lstore.table import Table
 from lstore.bufferpool import Bufferpool
 from lstore import config
 import os
+import json
 
 class Database():
 
@@ -17,7 +18,7 @@ class Database():
         # check if database is already open
         if self.isOpen:
             print("error: Database is already open")
-            return
+            return False
         
         # create directory for database or if it already exists, open it
         if not os.path.exists(path):
@@ -28,13 +29,27 @@ class Database():
 
         # initialize tables into memory
         for table in os.listdir(path):
-            self.tables.append(Table()) # TODO: get metadata from disk
+            with open(f'{path}.json', 'r') as table_metadata:
+                data = json.load(table_metadata)
+            
+            key = data["key"]
+            num_columns = data["num_columns"]
+            pagedir = data["page_directory"]
+            page_directory = []
+            for i in pagedir:
+                # tbh idk what to do with these so im just leaving them here
+                PR = pagedir[i]['page_range']
+                BP = pagedir[i]['base_page']
+                RN = pagedir[i]['record_number']
+                page_directory.append("idk man something goes here") # TODO: fix this
+
+            self.tables.append(Table(key=key, num_columns=num_columns, page_directory=page_directory)) # TODO: get metadata from disk
 
         # TODO: load page_directory into memory
 
         # create bufferpool
         self.bufferpool = Bufferpool(config.BUFFERPOOL_MAX_LENGTH) 
-        pass
+        return True
 
     def close(self):
         # TODO: Loop through bufferpool and write all dirty pages to disk
