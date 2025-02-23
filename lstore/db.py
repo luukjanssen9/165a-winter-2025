@@ -1,18 +1,22 @@
 from lstore.table import Table
 from lstore.bufferpool import Bufferpool
 from lstore import config
+import os
 
 class Database():
 
     def __init__(self):
         self.tables = []
-        self.bufferpool = Bufferpool(config.BUFFERPOOL_MAX_LENGTH) # Shouldnt this line be in the open function?
+        
 
     # Not required for milestone1
     def open(self, path):
-        # create directory for database
+        # create directory for database or if it already exists, open it
+        if not os.path.exists(path):
+            os.mkdir(path)
 
         # create bufferpool
+        self.bufferpool = Bufferpool(config.BUFFERPOOL_MAX_LENGTH) 
         pass
 
     def close(self):
@@ -28,7 +32,7 @@ class Database():
     :param key: int             #Index of table key in columns
     """
     def create_table(self, name, num_columns, key_index):
-        # TODO: create directory for table with associated files
+        # TODO: create file for table with associated files
         newTable = Table(name, num_columns, key_index)
         for table in self.tables:
             if table.name == newTable.name:
@@ -42,7 +46,7 @@ class Database():
     # Deletes the specified table
     """
     def drop_table(self, name):
-        # TODO: delete directory for table with associated files
+        # TODO: delete file for table with associated files
         for table in self.tables:
             if table.name==name:
                 self.tables.remove(table)  
@@ -53,7 +57,7 @@ class Database():
     # Returns table with the passed name
     """
     def get_table(self, name):
-        # TODO: return directory with the specified name 
+        # TODO: return file with the specified name 
         for table in self.tables:
             if table.name==name:
                 return table
