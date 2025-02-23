@@ -6,7 +6,6 @@ class Page:
         self.num_records = 0
         self.data = bytearray(config.ARRAY_SIZE)
 
-
     def has_capacity(self):
         if self.num_records < int(config.ARRAY_SIZE/config.VALUE_SIZE):
             # print(f"{self.num_records}/{int(config.ARRAY_SIZE/config.VALUE_SIZE)}")
