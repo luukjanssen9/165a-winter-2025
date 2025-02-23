@@ -25,11 +25,11 @@ class Table:
     :param index: Index         #Index object for the table
     :param pages: list          #List of pages in the table
     """
-    def __init__(self, name, num_columns, key):
+    def __init__(self, name, num_columns, key, page_directory):
         self.name = name 
         self.key = key
         self.num_columns = num_columns
-        self.page_directory = {} # RID - > {page_range_number, base_page_number, record_number} 
+        self.page_directory = page_directory # RID - > {page_range_number, base_page_number, record_number} 
         self.index = Index()
         self.page_ranges = []
         pass
