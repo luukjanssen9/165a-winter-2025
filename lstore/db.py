@@ -32,20 +32,18 @@ class Database():
             with open(f'{path}.json', 'r') as table_metadata:
                 data = json.load(table_metadata)
             
+            # get data from the json
             key = data["key"]
             num_columns = data["num_columns"]
-            pagedir = data["page_directory"]
-            page_directory = []
-            for i in pagedir:
-                # tbh idk what to do with these so im just leaving them here
-                PR = pagedir[i]['page_range']
-                BP = pagedir[i]['base_page']
-                RN = pagedir[i]['record_number']
-                page_directory.append("idk man something goes here") # TODO: fix this
+            json_page_dir = data["page_directory"]
 
-            self.tables.append(Table(key=key, num_columns=num_columns, page_directory=page_directory)) # TODO: get metadata from disk
-
-        # TODO: load page_directory into memory
+            # properly format the page_dir using the json data
+            page_directory = {}
+            for i in json_page_dir:
+                page_directory[i] = (json_page_dir[i]['page_range'], json_page_dir[i]['base_page'], json_page_dir[i]['record_number'])
+            
+            # create the table with the data from disk, and add it to memory
+            self.tables.append(Table(key=key, num_columns=num_columns, page_directory=page_directory))
 
         # create bufferpool
         self.bufferpool = Bufferpool(config.BUFFERPOOL_MAX_LENGTH) 
