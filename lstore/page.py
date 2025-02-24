@@ -1,3 +1,4 @@
+import os
 from lstore import config
 # PHYSICAL PAGE CLASS
 class Page:
@@ -71,6 +72,8 @@ class pageRange():
         self.tail_pages = []
         for i in range(config.PAGE_RANGE_SIZE):
             self.base_pages.append(PageGroup(num_columns, type=config.BASE_PAGE))
+
+        
     
     def has_capacity(self):
         for base_page in self.base_pages:

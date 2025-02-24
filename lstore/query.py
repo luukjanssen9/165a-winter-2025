@@ -32,6 +32,9 @@ class Query:
 
         # Locate the record in the page directory using the first RID (the most up to date version)
         page_range_num, base_page_num, record_num = self.table.page_directory[rid]
+        # TODO: Loop through the columns of the base page and check if each physical page is in the bufferpool
+        # TODO: If the page is not in the bufferpool, load it into the bufferpool
+        # TODO: do we write to disk here or is this part of the bufferpool?
         base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
 
         # Set the indirection, RID, and Timestam column of the base record to 0 to mark it as deleted
@@ -75,6 +78,8 @@ class Query:
         # Find available location to write to
         page_range_number, base_page_number, record_number = None, None, None
         
+        # TODO: Loop through bufferpool to find a page with capacity
+        # TODO: if bufferpool is full, find a page with capacity from disk
         # Iterate over page ranges to find a base page with capacity
         for pr_num, page_range in enumerate(self.table.page_ranges):
             for bp_num, base_page in enumerate(page_range.base_pages):
@@ -91,7 +96,8 @@ class Query:
         if page_range_number is None:
             page_range_number = len(self.table.page_ranges)
             new_page_range = pageRange(num_columns=self.table.num_columns)  # Create a new page range
-            self.table.page_ranges.append(new_page_range)
+            # self.table.page_ranges.append(new_page_range)
+            self.table.save_page_range(new_page_range)
             base_page_number = 0 # First base page in the new page range
             record_number = 0  # First slot in the new page
 
@@ -105,6 +111,7 @@ class Query:
 
         # Update page directory for hash table
         self.table.page_directory[rid] = (page_range_number, base_page_number, record_number)
+        # TODO: update metadata (page_directory) of table
 
         # Update index
         self.table.index.addRecord(primary_key, rid)
@@ -195,7 +202,7 @@ class Query:
             # records.append(Record(search_key, search_key, projected_values))
 
         else:
-            # TODO: Do we ever use this? Should we consider removing it?
+            # TODO: We will be using this a lot of this milestone. Does it work? Should we update it?
             # Use the index to find all matching RIDs instead of scanning everything
             rid_list = self.table.index.locate(search_key_index, search_key)
 
@@ -273,13 +280,17 @@ class Query:
         page_range = self.table.page_ranges[page_range_num]
 
         if not page_range.tail_pages:
-            page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))
+            new_tail_page = PageGroup(num_columns=self.table.num_columns)
+            self.table.save_tail_page(new_tail_page, page_range_num)
+            # page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))
 
         tailpage = page_range.tail_pages[-1]
         page = tailpage.pages[-1]
         # for page in tailpage.pages:
         if page.has_capacity()==False:
-            page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))
+            new_tail_page = PageGroup(num_columns=self.table.num_columns)
+            self.table.save_tail_page(new_tail_page, page_range_num)
+            # page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))
 
         # run this line again to ensure that you have the most up to date range, in case a new page range was created
         page_range = self.table.page_ranges[page_range_num]
