@@ -58,25 +58,46 @@ class Table:
             os.mkdir(f"{self.path}/{page_range_number}/b{i}")
             # TAIL PAGES: os.mkdir(f"{self.path}/{page_range_number}/t{i}")
 
-            # 
-            # CREATE COLUMN FILES LAZILY!!! MORE EFFICIENT THAT WAY
-            # 
-
-            # for j in range(page_range.base_pages[i].pages):
-            #     # make file with column num (page_range.base_pages[i].pages[j] is the j'th file)
-            
-            #     # wouldnt be mkdir, would me a w+ open probably
-            #     os.mkdir(f"{self.path}/{page_range_number}/b{i}/col{j}")
-            #     # TAIL PAGES: os.mkdir(f"{self.path}/{page_range_number}/t{i}/col{j}")
-            
-            #     # create metadata files for all columns
+            for j in range(page_range.base_pages[i].pages):
+                # make file with column num (page_range.base_pages[i].pages[j] is the j'th file)
+                path = f"{self.path}/{page_range_number}/b{i}"
+                path_offset = f"col{j}"
+                self.save_column(path=path, path_offset=path_offset, page=page_range.base_pages[i].pages[j])
+                # TAIL PAGES: t{i}/col{j}
         self.page_ranges.append(page_range)
 
-    def save_tail_page(self, tail_page):
-        # very similar to saving a base page like the above function. you dont create any phys pages tho, those will be added soon enough
-        # make sure to replace the `page_range.tail_pages.append()` with a call to this function
+    def save_tail_page(self, tail_page, page_range_number):
+        # ensure that page range exists
+        if os.path.isdir(f"{self.path}/{page_range_number}")==False:
+            print(f"error: Page range #{page_range_number} does not exist")
+            return False
         
+        num_folders = 0
+        # count the number of tail pages that already exist by getting every folder inside the page range and subtracting the 16 base pages
+        for dir in os.listdir(f"{self.path}/{page_range_number}"):
+            if os.path.isdir(dir):
+                num_folders += 1
+        tail_page_number = num_folders-16 # remove 16 base pages
 
-        
-        # self.page_range.tail_pages.append(tail_page)
+        os.mkdir(f"{self.path}/{page_range_number}/t{tail_page_number}")
+
+        # create columns
+        for i in range(tail_page.pages):
+                path = f"{self.path}/{page_range_number}/t{tail_page_number}"
+                path_offset = f"col{i}"
+                self.save_column(path=path, path_offset=path_offset, page=tail_page.pages[i])
+        # add the tail page to the page range in memory
+        self.page_ranges[page_range_number].tail_pages.append(tail_page)
+
+        # make sure to replace the `page_range.tail_pages.append()` with a call to this function. you can get page_range_number with `len(self.table.page_ranges)` before calling this func
+        return True
+
+    def save_column(self, path, path_offset, page):
+        file_path = f"{path}/{path_offset}" 
+                             # ex: ./b{i}/col{j}
+        metadata_path = path # ex: ./b{i}/
+
+        # TODO: implement physical page saving by putting the full binary data into a file
+        # should be a simple write to the path. the problem is how to write the page's binary data.
+        # we might as well write the metadata while we're here, but i dont think we need to
         pass

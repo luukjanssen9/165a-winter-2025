@@ -280,13 +280,17 @@ class Query:
         page_range = self.table.page_ranges[page_range_num]
 
         if not page_range.tail_pages:
-            page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))
+            new_tail_page = PageGroup(num_columns=self.table.num_columns)
+            self.table.save_tail_page(new_tail_page, page_range_num)
+            # page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))
 
         tailpage = page_range.tail_pages[-1]
         page = tailpage.pages[-1]
         # for page in tailpage.pages:
         if page.has_capacity()==False:
-            page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))
+            new_tail_page = PageGroup(num_columns=self.table.num_columns)
+            self.table.save_tail_page(new_tail_page, page_range_num)
+            # page_range.tail_pages.append(PageGroup(num_columns=self.table.num_columns))
 
         # run this line again to ensure that you have the most up to date range, in case a new page range was created
         page_range = self.table.page_ranges[page_range_num]
