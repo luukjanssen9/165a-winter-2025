@@ -96,7 +96,8 @@ class Query:
         if page_range_number is None:
             page_range_number = len(self.table.page_ranges)
             new_page_range = pageRange(num_columns=self.table.num_columns)  # Create a new page range
-            self.table.page_ranges.append(new_page_range)
+            # self.table.page_ranges.append(new_page_range)
+            self.table.save_page_range(new_page_range)
             base_page_number = 0 # First base page in the new page range
             record_number = 0  # First slot in the new page
 

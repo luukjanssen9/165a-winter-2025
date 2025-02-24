@@ -54,6 +54,7 @@ class Database():
     """
     # Creates a new table
     :param name: string         #Table name
+    :param path: string         #Path of directory
     :param num_columns: int     #Number of Columns: all columns are integer
     :param key: int             #Index of table key in columns
     """
@@ -62,20 +63,24 @@ class Database():
         if not self.isOpen:
             print("error: Database is not open")
             return None
+        
+        # define path
+        newpath = f"{self.path}/{name}" 
+        
         # check if table directory already exists
-        if os.path.isdir(f"{self.path}/{name}"):
+        if os.path.isdir(newpath):
             print(f"error: A table with the name \"{name}\" already exists")
             return None
 
         # create table directory
-        os.mkdir(f"{self.path}/{name}")
+        os.mkdir(newpath)
 
         # TODO: Save table metadata to disk
         # idk if we need this since we already write to disk on close
         # self.write_table_metadata(table)
 
         # create table object
-        newTable = Table(name, num_columns, key_index)
+        newTable = Table(name=name, path=newpath, num_columns=num_columns, page_directory=key_index)
         for table in self.tables:
             if table.name == newTable.name:
                 print(f"error: A table with the name \"{table.name}\" already exists")
@@ -125,6 +130,7 @@ class Database():
             
         # get data from the json
         name = data["name"]
+        path = data["path"]
         key = data["key"]
         num_columns = data["num_columns"]
         json_page_dir = data["page_directory"]  
@@ -135,7 +141,7 @@ class Database():
             page_directory[i] = (json_page_dir[i]['page_range'], json_page_dir[i]['base_page'], json_page_dir[i]['record_number'])
         
         # create the table with the data from disk, and add it to memory
-        new_table = Table(name=name, key=key, num_columns=num_columns, page_directory=page_directory)
+        new_table = Table(name=name, path=path, key=key, num_columns=num_columns, page_directory=page_directory)
         self.tables.append(new_table)
         return new_table
     
@@ -167,6 +173,7 @@ class Database():
         # create metadata dict
         table_metadata = {
             "name" : table.name,
+            "path" : table.path,
             "key" : table.key,
             "num_columns" : table.num_columns,
             "page_directory" : json_page_dir
