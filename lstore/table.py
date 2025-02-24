@@ -71,3 +71,12 @@ class Table:
             
             #     # create metadata files for all columns
         self.page_ranges.append(page_range)
+
+    def save_tail_page(self, tail_page):
+        # very similar to saving a base page like the above function. you dont create any phys pages tho, those will be added soon enough
+        # make sure to replace the `page_range.tail_pages.append()` with a call to this function
+        
+
+        
+        # self.page_range.tail_pages.append(tail_page)
+        pass
