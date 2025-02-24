@@ -100,4 +100,6 @@ class Table:
         # TODO: implement physical page saving by putting the full binary data into a file
         # should be a simple write to the path. the problem is how to write the page's binary data.
         # we might as well write the metadata while we're here, but i dont think we need to
+        # the metadata should be a simple json that contains nothing but page.num_columns.
+        # metadata file goes to the metadata_path i created above. the actual file goes to file_path.
         pass
