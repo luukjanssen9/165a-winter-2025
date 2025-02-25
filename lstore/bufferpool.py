@@ -43,8 +43,8 @@ class Bufferpool:
                 # do the col and RID match
                 if RID == table.index.indices[column_number][record]: #TODO: check if this is corrects
                 # if RID == frame.page.read(column_number): # Check to make sure that this is correct
-                    frame.pinned = True
-                    frame.pins+=1
+                    # frame.curr_pins+=1
+                    frame.total_pins+=1
                     return frame.page
         
         #
