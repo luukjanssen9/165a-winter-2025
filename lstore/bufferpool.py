@@ -126,12 +126,12 @@ class Bufferpool:
 
         if tail_page_rid == 0:
             # if there is no tail page, then the base page is the tail page
-            full_path = f"{table.path}/{page_range_num}/b{base_page_num}/col{column_number}"
-            met_path = f"{table.path}/{page_range_num}/b{base_page_num}/met{column_number}"
+            full_path = f"{table.path}/{page_range_num}/b{base_page_num}/col{column_number}.bin"
+            met_path = f"{table.path}/{page_range_num}/b{base_page_num}/col{column_number}.json"
         else:
             # if there is a tail page, then we need to find the tail page
-            full_path = f"{table.path}/{page_range_num}/t{tail_page_rid}/col{column_number}"
-            met_path = f"{table.path}/{page_range_num}/b{tail_page_rid}/met{column_number}"
+            full_path = f"{table.path}/{page_range_num}/t{tail_page_rid}/col{column_number}.bin"
+            met_path = f"{table.path}/{page_range_num}/t{tail_page_rid}/col{column_number}.json"
 
         # read the page from disk
         with open(full_path, 'rb') as data_file:
@@ -158,8 +158,8 @@ class Bufferpool:
         # get bufferpool page
         frame = self.frames[bufferpoolIndex]
 
-        full_path = f"{frame.path}/col{frame.column_number}"
-        met_path = f"{frame.path}/met{frame.column_number}"
+        full_path = f"{frame.path}/col{frame.column_number}.bin"
+        met_path = f"{frame.path}/col{frame.column_number}.json"
 
         # write the page to disk
         with open(full_path, 'wb+') as data_file:

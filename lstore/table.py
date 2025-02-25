@@ -1,5 +1,7 @@
 import os
+import json
 from time import time
+from lstore.page import pageRange, PageGroup
 from lstore.index import Index
 from lstore.page import Page
 from lstore import config
@@ -97,17 +99,139 @@ class Table:
         return True
 
     def save_column(self, path, path_column, page):
-        file_path = f"{path}/col{path_column}" 
-                             # ex: ./b{i}/col{j}
-        metadata_path = f"{path}/met{path_column}"
-                             # ex: ./b{i}/met{j}
+        file_path = f"{path}/col{path_column}.bin" 
+        metadata_path = f"{path}/col{path_column}.json"
 
         # write page.data to data file
         with open(file_path, 'wb+') as data_file:
             data_file.write(page.data)
             # data_file.close()
 
-        # write page.num_records to metadata file
+        # turn metadata to json
+        phys_page_metadata = {
+            "num_records" : page.num_records
+        }
+
+        # write to metadata file
         with open(metadata_path, 'w+') as metadata_file:
-            metadata_file.write(page.num_records)
+            metadata_file.write(phys_page_metadata)
             # metadara_file.close()
+
+    def open_page_ranges(self):
+        
+        # use os to see all page ranges in dir
+        currdir = self.path
+        range_pairs = []
+        for dir in os.listdir(currdir):
+            if dir.isdigit():  # Check if the entry is a number (folder name)
+                folder_path = os.path.join(currdir, dir)
+                json_path = os.path.join(currdir, f"{dir}.json")
+
+                if os.path.isdir(folder_path) and os.path.isfile(json_path):
+                    range_pairs.append((folder_path, json_path))
+
+                # order pairs numerically
+                range_pairs.sort(key=lambda x: int(os.path.basename(x[0])))
+
+                # iterate through the pairs
+                for path_folder, path_json in range_pairs:
+                    # inside each page range, read the metadata
+                    with open(path_json, "r") as range_metadata:
+                        data = json.load(range_metadata)
+                    
+                    # get data from json
+                    num_columns = data["num_columns"]
+                    latest_bp = data["latest_base_page"]
+                    latest_tp = data["latest_tail_page"]
+
+                    # use the data to create a page range object
+                    new_range = pageRange(num_columns=num_columns, latest_bp=latest_bp, latest_tp=latest_tp, new=False)
+                    # then go into the page range folder and use os to see all base and tail pages
+                    self.open_page_groups(new_range, path_folder)
+                    # add page range to table
+                    self.page_ranges.append(new_range)
+
+    def open_page_groups(self, page_range, path_folder):
+        base_pairs = []
+        tail_pairs = []
+
+        for dir in os.listdir(path_folder):
+            if dir.startswith("b") and dir[1:].isdigit():  # Check if base
+                num = int(dir[1:])  # get number
+                folder_path = os.path.join(path_folder, dir)
+                json_path = os.path.join(path_folder, f"b{num}.json")
+                if os.path.isdir(folder_path) and os.path.isfile(json_path):
+                    base_pairs.append((folder_path, json_path))
+
+            elif dir.startswith("t") and dir[1:].isdigit():  # Check if tail
+                num = int(dir[1:])  # get number
+                folder_path = os.path.join(path_folder, dir)
+                json_path = os.path.join(path_folder, f"t{num}.json")
+                if os.path.isdir(folder_path) and os.path.isfile(json_path):
+                    tail_pairs.append((folder_path, json_path))
+
+        # order pairs numerically
+        base_pairs.sort(key=lambda x: int(os.path.basename(x[0])[1:]))
+        tail_pairs.sort(key=lambda x: int(os.path.basename(x[0])[1:]))
+        
+        # iterate through the base pairs
+        for path_folder, path_json in base_pairs:
+            # read the metadata, use it to create page group objects
+            with open(path_json, "r") as base_page_metadata:
+                data = json.load(base_page_metadata)
+            
+            # get data from json
+            latest_record_number = data["latest_record_number"]
+
+            # use the data to create a page group object
+            new_base_page = PageGroup(num_columns=page_range.num_columns, type=config.BASE_PAGE, latest_record_number=latest_record_number)
+            # then go into base page folder and use os to see all phys pages
+            self.open_phys_pages(new_base_page, path_folder)
+            # add base page to table
+            page_range.base_pages.append(new_base_page)
+
+        for path_folder, path_json in tail_pairs:
+            # read the metadata, use it to create page group objects
+            with open(path_json, "r") as tail_page_metadata:
+                data = json.load(tail_page_metadata)
+            
+            # get data from json
+            latest_record_number = data["latest_record_number"]
+
+            # use the data to create a page group object
+            new_tail_page = PageGroup(num_columns=page_range.num_columns, type=config.TAIL_PAGE, latest_record_number=latest_record_number)
+            
+            # TODO: i think bringing the phys pages to memory goes against the entire point of the buffer pool. the metadata that the page has isnt needed either, as the page groups already track what their next open page is.
+            # # then go into tail page folder and use os to see all phys pages
+            # self.open_phys_pages(new_tail_page, path_folder)
+            
+            # add base page to table
+            page_range.tail_pages.append(new_tail_page)
+
+    # def open_phys_pages(self, page_group, path_folder):
+    #     # use os to see all phys page in dir
+    #     page_pairs = []
+    #     for dir in os.listdir(path_folder):
+    #         if dir.startswith("col") and dir[3:].isdigit():  # Check if column file
+    #             bin_path = os.path.join(path_folder, f"col{dir}.bin")
+    #             json_path = os.path.join(path_folder, f"col{dir}.json")
+
+    #             if os.path.isfile(bin_path) and os.path.isfile(json_path):
+    #                 page_pairs.append((bin_path, json_path))
+
+    #             # order pairs numerically
+    #             page_pairs.sort(key=lambda x: int(os.path.basename(x[0])))
+
+    #             # iterate through the pairs
+    #             for path_folder, path_json in page_pairs:
+    #                 # inside each page range, read the metadata
+    #                 with open(path_json, "r") as page_metadata:
+    #                     data = json.load(page_metadata)
+                    
+    #                 # get data from json
+    #                 num_records = data["num_records"]
+
+    #                 # use the data to create a page range object
+    #                 new_page = Page(num_records=num_records)
+    #                 # add page to page group
+    #                 page_group.append(new_page)
