@@ -67,13 +67,14 @@ class Query:
         
         # Generate metadata
         rid = self.rid_counter
+        base_id = rid
         self.rid_counter += 1
         schema_encoding = int('0' * self.table.num_columns, 2) 
         timestamp = int(time())  
         indirection = 0 
         
         # Convert into a full record format
-        record = [indirection, rid, timestamp, schema_encoding] + list(columns)
+        record = [indirection, rid, timestamp, schema_encoding, base_id] + list(columns)
 
         # Find available location to write to
         page_range_number, base_page_number, record_number = None, None, None
@@ -253,13 +254,14 @@ class Query:
         record = self.select(primary_key, 0, [1] * self.table.num_columns)
 
         if record is None: # no match -> update fails
-            return False  
+            return False
     
 
         # # Locate the record in the page directory using RID
         page_range_num, base_page_num, record_num = self.table.page_directory[rid]
         base_page = self.table.page_ranges[page_range_num].base_pages[base_page_num]
         base_page_indirection = base_page.pages[config.INDIRECTION_COLUMN].read(record_num) 
+        base_id = base_page.pages[config.BASE_ID_COLUMN].read(record_num) 
 
         stored_values = record[0].columns
         # Get the current values of the record
@@ -274,7 +276,7 @@ class Query:
         indirection = base_page_indirection
 
         # Convert into a full record format
-        new_record = [indirection, new_rid, timestamp, schema_encoding] + updated_values
+        new_record = [indirection, new_rid, timestamp, schema_encoding, base_id] + updated_values
 
         # Find available location to write the new version
         page_range = self.table.page_ranges[page_range_num]

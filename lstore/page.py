@@ -40,6 +40,7 @@ class PageGroup():
     def __init__(self, num_columns, type=config.TAIL_PAGE):
         self.pages = []
         self.type = type
+        self.TPS = 0                # Tail-Page Sequence Number (only used in base pages)
         # Initialize pages for each column upfront
         for _ in range(num_columns+4):
             self.pages.append(Page())
@@ -82,4 +83,10 @@ class pageRange():
         return False
 
 
+    def do_merge(self):
+        print("starting merge")
+
+        relevant_base_pages = []
+        for tailP in self.tail_pages:
+            ...
     
