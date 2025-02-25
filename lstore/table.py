@@ -4,14 +4,12 @@ from lstore.index import Index
 from lstore.page import Page
 from lstore import config
 
-INDIRECTION_COLUMN = 0 # Each record also includes an indirection column that points to the latest tail record holding the latest update to the record
-RID_COLUMN = 1 # Each record is assigned a unique identier called an RID, which is often the physical location where the record is actually stored.
-TIMESTAMP_COLUMN = 2 # Not sure what this is for ?
-SCHEMA_ENCODING_COLUMN = 3 # This is a bit vector with one bit per column that stores information about the updated state of each column
-
+INDIRECTION_COLUMN = 0 
+RID_COLUMN = 1 
+TIMESTAMP_COLUMN = 2 
+SCHEMA_ENCODING_COLUMN = 3 
 
 class Record:
-
     def __init__(self, rid, key, columns):
         self.rid = rid
         self.key = key
@@ -106,3 +104,58 @@ class Table:
         with open(metadata_path, 'w+') as metadata_file:
             metadata_file.write(page.num_records)
             # metadara_file.close()
+        
+        # Create indices for all columns including the primary key
+        for col in range(num_columns):
+            self.index.create_index(col)
+
+    def insert_record(self, rid, values):
+        if len(values) != self.num_columns:
+            raise ValueError("Invalid number of values")
+        
+        # Insert into table data structures (assuming some storage logic exists)
+        record = Record(rid, values[self.key], values)
+        self.page_directory[rid] = record  # Store record (simplified for this example)
+        
+        # Update indices for all indexed columns
+        for col_index, value in enumerate(values):
+            self.index.addRecord(value, rid, col_index)
+
+    def delete_record(self, rid):
+        if rid not in self.page_directory:
+            print("Record not found")
+            return False
+        
+        record = self.page_directory[rid]
+        
+        # Remove record from all indices
+        for col_index, value in enumerate(record.columns):
+            self.index.removeRecord(value, rid, col_index)
+        
+        # Remove record from storage
+        del self.page_directory[rid]
+        return True
+
+    def update_record(self, rid, new_values):
+        if rid not in self.page_directory:
+            print("Record not found")
+            return False
+        
+        record = self.page_directory[rid]
+        
+        # Update indices: Remove old values, add new ones
+        for col_index, (old_value, new_value) in enumerate(zip(record.columns, new_values)):
+            if old_value != new_value:
+                self.index.removeRecord(old_value, rid, col_index)
+                self.index.addRecord(new_value, rid, col_index)
+        
+        # Update record storage
+        record.columns = new_values
+        return True
+
+    def locate(self, value, column):
+        return self.index.locate(value, column)
+
+    def locate_range(self, begin, end, column):
+        return self.index.locate_range(begin, end, column)
+
