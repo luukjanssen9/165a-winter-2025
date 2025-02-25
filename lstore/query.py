@@ -80,34 +80,14 @@ class Query:
         # Find available location to write to
         page_range_number, base_page_number, record_number = None, None, None
         
-
-        # TODO: get the 0th column of the latest pagerange / pagegroup and put it into bufferpool (Rami check if below is good)
-        
+        # Get the latestpage and check if it has capacity
+        # TODO: we do not use latest record here. Do we need it at all?
         page = self.bufferpool.getBufferpoolPage(self.rid_counter, 0, self.table)
 
         if page.has_capacity():
             page_range_number = self.table.latest_page_range
             base_page_number = self.table.page_ranges[self.table.latest_page_range].latest_base_page
             record_number = page.num_records
-        else:
-            # If no available space is found, create a new page range
-            # Is this correct?
-            new_page_range = pageRange(num_columns=self.table.num_columns)
-
-        # TODO: do we need extra checks here?
-
-        '''
-        # Iterate over page ranges to find a base page with capacity
-        for pr_num, page_range in enumerate(self.table.page_ranges):
-            for bp_num, base_page in enumerate(page_range.base_pages):
-                # print(f"Checking capacity for Page Range {pr_num}, Base Page {bp_num}: {base_page.has_capacity()}")
-                if base_page.has_capacity():
-                    page_range_number, base_page_number = pr_num, bp_num
-                    record_number = base_page.pages[0].num_records  # Use next available slot
-                    break
-            if page_range_number is not None:
-                break
-        '''
 
         # If no available space is found, create a new page range
         # Since base pages are created upon page range initialization, we only need to create a new page range
@@ -127,6 +107,10 @@ class Query:
         # Write the record
         if not page_range.base_pages[base_page_number].write(*record, record_number=record_number):
             return False  
+        
+        # Update the latest page range and base page
+        self.table.latest_page_range = page_range_number
+        page_range.latest_base_page = base_page_number
 
         # Update page directory for hash table
         self.table.page_directory[rid] = (page_range_number, base_page_number, record_number)
