@@ -34,6 +34,7 @@ class Table:
         self.page_directory = page_directory # RID - > {page_range_number, base_page_number, record_number} 
         self.index = Index()
         self.page_ranges = []
+        self.base_id = {}
         pass
 
     def __merge(self):

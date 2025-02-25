@@ -306,6 +306,8 @@ class Query:
         # Update the indirection column of the base record to point to the new version
         offset_number = record_num * config.VALUE_SIZE
         base_page.pages[config.INDIRECTION_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = new_rid.to_bytes(config.VALUE_SIZE, byteorder='little')
+        # connect the tail page's rid to the base page
+        self.table.base_id[new_rid] = rid
 
         return True
     
