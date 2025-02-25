@@ -30,7 +30,7 @@ class Table:
     :param index: Index         #Index object for the table
     :param pages: list          #List of pages in the table
     """
-    def __init__(self, name, path, num_columns, key, page_directory, latest_page_range):
+    def __init__(self, name, path, num_columns, key, page_directory, latest_page_range, bufferpool):
         self.name = name 
         self.path = path
         self.key = key
@@ -39,7 +39,7 @@ class Table:
         self.index = Index()
         self.page_ranges = []
         self.latest_page_range = latest_page_range
-        self.bufferpool:Bufferpool = Bufferpool(config.BUFFERPOOL_MAX_LENGTH)
+        self.bufferpool:Bufferpool = bufferpool
         pass
 
     def __merge(self):

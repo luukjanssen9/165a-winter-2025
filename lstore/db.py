@@ -10,6 +10,7 @@ class Database():
         self.tables = []
         self.isOpen = False
         self.path = None
+        self.bufferpool = Bufferpool(config.BUFFERPOOL_MAX_LENGTH)
         
 
     # Not required for milestone1
@@ -72,7 +73,7 @@ class Database():
             return None
         
         # define path
-        newpath = f"{self.path}/{name}" 
+        newpath = f"lstore/{self.path}/{name}" 
         
         # check if table directory already exists
         if os.path.isdir(newpath):
@@ -83,7 +84,7 @@ class Database():
         
 
         # create table object
-        newTable = Table(name=name, path=newpath, num_columns=num_columns, page_directory={}, key=key_index, latest_page_range=None) # TODO: what do we do with page directory?
+        newTable = Table(name=name, path=newpath, num_columns=num_columns, page_directory={}, key=key_index, latest_page_range=None, bufferpool=self.bufferpool) # TODO: what do we do with page directory?
         for table in self.tables:
             if table.name == newTable.name:
                 print(f"error: A table with the name \"{table.name}\" already exists")
@@ -118,7 +119,7 @@ class Database():
             print("error: Database is not open")
             return None
         # check if table directory exists
-        if not os.path.isdir(f"{self.path}/{name}"):
+        if not os.path.isdir(f"lstore/{self.path}/{name}"):
             # if it doesn't exist, there is an error
             print(f"error: No table with the name \"{name}\" exists")
             return None
@@ -128,7 +129,7 @@ class Database():
                 return table
             
         # if you get this far, then the table isnt in memory yet. 
-        with open(f'{self.path}/{name}.json', 'r') as table_metadata:
+        with open(f'lstore/{self.path}/{name}.json', 'r') as table_metadata:
             data = json.load(table_metadata)
             
         # get data from the json

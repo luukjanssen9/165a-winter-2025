@@ -88,14 +88,17 @@ class Query:
         # Convert into a full record format
         record = [indirection, rid, timestamp, schema_encoding] + list(columns)
 
-        # Find available location to write to
-        page_range_number, base_page_number, record_number = None, None, None
+        # Get the next available location
+        page_range_number, base_page_number, record_number = self.table.latest_page_range, self.table.page_ranges[self.table.latest_page_range].latest_base_page, self.table.page_ranges[self.table.latest_page_range].base_pages[self.table.page_ranges[self.table.latest_page_range].latest_base_page].latest_record_number
         
+        # Update page directory for hash table
+        self.table.page_directory[rid] = (page_range_number, base_page_number, record_number)
+
         # Get the latestpage and check if it has capacity
         # TODO: we do not use latest record here. Do we need it at all?
-        page = self.table.bufferpool.getBufferpoolPage(self.rid_counter, 0, self.table)
+        page = self.table.bufferpool.getBufferpoolPage(rid, config.RID_COLUMN, self.table)
 
-        if page.has_capacity():
+        if not page.has_capacity():
             page_range_number = self.table.latest_page_range
             base_page_number = self.table.page_ranges[self.table.latest_page_range].latest_base_page
             record_number = page.num_records
@@ -123,8 +126,12 @@ class Query:
         self.table.latest_page_range = page_range_number
         page_range.latest_base_page = base_page_number
 
-        # Update page directory for hash table
-        self.table.page_directory[rid] = (page_range_number, base_page_number, record_number)
+        # Update the latest numbers
+        if record_number >= config.ARRAY_SIZE/config.VALUE_SIZE:
+            self.table.page_ranges[self.table.latest_page_range].base_pages[self.table.page_ranges[self.table.latest_page_range].latest_base_page].latest_record_number = 0
+            if base_page_number >= config.PAGE_RANGE_SIZE:
+                self.table.page_ranges[self.table.latest_page_range].latest_base_page = 0
+                self.table.latest_page_range += 1
 
         # Update index
         self.table.index.addRecord(primary_key, rid)
