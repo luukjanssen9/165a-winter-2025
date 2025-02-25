@@ -1,4 +1,5 @@
 from lstore import config
+from lstore.page import Page
 # FRAME CLASS
 class Frame:
     def __init__(self):
@@ -36,11 +37,11 @@ class Bufferpool:
                 #read each record in the page
                 record = page.read(i)
                 # do the col and RID match
-                if RID in tableindex.indices[column_number][record].values(): #TODO: check if this is correct
+                if RID == tableindex.indices[column_number][record]: #TODO: check if this is corrects
                 # if RID == frame.page.read(column_number): # Check to make sure that this is correct
                     frame.pinned = True
                     frame.pins+=1
-                    return frame
+                    return frame.page
         
         #
         # if you make it this far, then the page is not in bufferpool
@@ -52,7 +53,7 @@ class Bufferpool:
 
         # read the page from disk
         page = self.readFromDisk(RID, column_number, tableindex)
-        if self.add(frame)==False:
+        if self.add(page)==False:
             print("error, buffer pool has no space despite capacity check passing")
             return False
         # Should we unpin the page here??
@@ -101,20 +102,38 @@ class Bufferpool:
         self.size -= 1
         return True
     
-    def readFromDisk(self, RID, column_number, tableindex):
-    
-        # you have the RID and record_num. use page directory to get the page group and page range. then read them from disk
-        # return the page group
+    def readFromDisk(self, RID, column_number, tableindex, tablepath):
+        # get page group number and basePage number from page directory
+        page_range_num, base_page_num, record_num = self.table.page_directory[RID]
 
+        # get the tailpage number from the base page indirection column
+        tail_page_rid = base_page_num.pages[config.INDIRECTION_COLUMN].read(record_num) 
 
+        if tail_page_rid == 0:
+            # if there is no tail page, then the base page is the tail page
+            full_path = f"{tablepath}/{page_range_num}/b{base_page_num}"
+        else:
+            # if there is a tail page, then we need to find the tail page
+            full_path = f"{tablepath}/{page_range_num}/t{tail_page_rid}"
+
+        # read the page from disk
+        with open(full_path, 'rb') as data_file:
+            page_data = bytearray(data_file.read())
+            # data_file.close()
+
+        page = Page(page_data, len(page_data))    
         #
         # MAKE SURE YOU CREATE AN INDEX FOR THE PAGE
         #
-        # index.indices[column_number] = something like index.create_index()
-
-
-        # add to the buffer pool with self.add()
-        pass
+        # loop through page records
+        # TODO: Is this correct? should we do this every time we read?
+        for i in range (0,page.num_records):
+            #read each record in the page
+            record = page.read(i)
+            # add to index
+            tableindex.indices[column_number][record] = RID
+        return page
+        
     
     def writeToDisk(self, bufferpoolIndex):
         # uses bufferpool[bufferpoolIndex]
