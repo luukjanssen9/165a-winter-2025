@@ -2,7 +2,7 @@ import json
 import os
 
 # THIS SEGMENT TESTS TO SEE WHAT IN THE DIRECTORY IS A FOLDER VS A FILE
-# TRUE = FOLDER, FAKSE = FILE
+# TRUE = FOLDER, FALSE = FILE
 # currdir = "."
 # for thing in os.listdir(currdir):
 #     print(f"{thing}: {os.path.isdir(thing)}")

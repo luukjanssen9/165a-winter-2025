@@ -147,6 +147,7 @@ class Database():
         
         # create the table with the data from disk, and add it to memory
         new_table = Table(name=name, path=path, key=key, num_columns=num_columns, page_directory=page_directory, latest_page_range=latest_page_range)
+        new_table.open_page_ranges() # goes through everything inside and reads to memory
         self.tables.append(new_table)
         return new_table
     
@@ -195,7 +196,8 @@ class Database():
         for i in table.page_ranges:
             page_range_metadata = {
                 "latest_base_page" : table.page_ranges[i].latest_base_page,
-                "latest_tail_page" : table.page_ranges[i].latest_tail_page
+                "latest_tail_page" : table.page_ranges[i].latest_tail_page,
+                "num_columns" : table.page_ranges[i].num_columns
             }
 
             # save the page range's metadata first
@@ -226,8 +228,4 @@ class Database():
                     # if 0 bytes are written then it failed
                     if tail_page_output_file.write(tail_page_metadata)==0:
                         return False
-
-
-
-            # write metadata for page groups
 
