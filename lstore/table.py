@@ -38,6 +38,18 @@ class Table:
         pass
 
     def __merge(self):
+        # Step 1: Identify committed tail records in tail pages
+
+        # Step 2: Load the corresponding outdated base pages
+
+        # Step 3: Consolidate the base and tail pages
+        # Traverse base_id dictionary/metadata column in reverse to find list of latest version of every
+        # updated record since the last merge
+        # Then apply the latest tail records in reverse order to the base records until the list is exhausted
+
+        # Step 4: Update the page directory
+
+        # Step 5: De-allocate the outdated base pages
         print("merge is happening")
         pass
 
