@@ -87,6 +87,9 @@ class Table:
                 self.save_column(path=path, path_column=i, page=tail_page.pages[i])
         # add the tail page to the page range in memory
         self.page_ranges[page_range_number].tail_pages.append(tail_page)
+        if self.page_ranges[page_range_number].latest_tail_page==None:
+            self.page_ranges[page_range_number].latest_tail_page = 0
+        else: self.page_ranges[page_range_number].latest_tail_page += 1
 
         # make sure to replace the `page_range.tail_pages.append()` with a call to this function. you can get page_range_number with `len(self.table.page_ranges)` before calling this func
         return True

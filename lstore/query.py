@@ -91,6 +91,9 @@ class Query:
             if page_range_number is not None:
                 break
 
+        # find the latest page range
+            # find the latest base page
+
         # If no available space is found, create a new page range
         # Since base pages are created upon page range initialization, we only need to create a new page range
         if page_range_number is None:
