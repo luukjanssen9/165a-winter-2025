@@ -31,12 +31,16 @@ class Bufferpool:
         for frame in self.frames:
             # return the page if it is already in bufferpool
 
-            # do the col and RID match
-            if RID in tableindex.indices[column_number].values():
-            # if RID == frame.page.read(column_number): # Check to make sure that this is correct
-                frame.pinned = True
-                frame.pins+=1
-                return frame
+            # loop through records in the page
+            for i in range (0,frame.page.num_records):
+                #read each record in the page
+                record = page.read(i)
+                # do the col and RID match
+                if RID in tableindex.indices[column_number][record].values(): #TODO: check if this is correct
+                # if RID == frame.page.read(column_number): # Check to make sure that this is correct
+                    frame.pinned = True
+                    frame.pins+=1
+                    return frame
         
         #
         # if you make it this far, then the page is not in bufferpool
