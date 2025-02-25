@@ -27,7 +27,7 @@ class Table:
     :param index: Index         #Index object for the table
     :param pages: list          #List of pages in the table
     """
-    def __init__(self, name, path, num_columns, key, page_directory):
+    def __init__(self, name, path, num_columns, key, page_directory, latest_page_range):
         self.name = name 
         self.path = path
         self.key = key
@@ -35,6 +35,7 @@ class Table:
         self.page_directory = page_directory # RID - > {page_range_number, base_page_number, record_number} 
         self.index = Index()
         self.page_ranges = []
+        self.latest_page_range = latest_page_range
         pass
 
     def __merge(self):
