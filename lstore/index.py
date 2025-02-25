@@ -1,79 +1,85 @@
 """
 A data structure holding indices for various columns of a table. Key column should be indexed by default, other columns can be indexed through this object. Indices are usually B-Trees, but other data structures can be used as well.
 """
-
 from collections import defaultdict
+import pickle
+import os
+from sortedcontainers import SortedDict  # better for range queries
 from lstore import config
 
 class Index:
-    def __init__(self):
-        # Dictionary of dictionaries: using default dick instead of none
-        self.indices = defaultdict(lambda: defaultdict(list))
-        # Ensure primary key index is created
-        self.create_index(config.PRIMARY_KEY_COLUMN)
+    def __init__(self, table_name):
+        self.indices = defaultdict(lambda: SortedDict())  # Changed from defaultdict(list) to SortedDict
+        self.table_name = table_name
+        self.index_file = f"{table_name}_index.pkl"
+        
+        # Load index from disk if it exists
+        self.load_index()
 
     '''
     Add new record entry to index
     '''
-    def addRecord(self, key, RID, key_col=config.PRIMARY_KEY_COLUMN):
+    def addRecord(self, key, rid, key_col=config.PRIMARY_KEY_COLUMN):
         if key_col not in self.indices:
-            print(f"no index exists for column {key_col}")
+            print(f"Warning: No index exists for column {key_col}. Skipping index update.")
             return
-        self.indices[key_col][key].append(RID)
+        if key in self.indices[key_col]:
+            self.indices[key_col][key].append(rid)
+        else:
+            self.indices[key_col][key] = [rid]
 
     '''
-    Remove a record entry from index (used when deleting or updating records)
+    Remove a record entry from index
     '''
-    def removeRecord(self, key, RID, key_col=config.PRIMARY_KEY_COLUMN):
+    def removeRecord(self, key, rid, key_col=config.PRIMARY_KEY_COLUMN):
         if key_col not in self.indices:
             return
         if key in self.indices[key_col]:
-            self.indices[key_col][key].remove(RID)
-            if not self.indices[key_col][key]:  # Remove empty entries
+            self.indices[key_col][key].remove(rid)
+            if not self.indices[key_col][key]:  # Remove empty lists
                 del self.indices[key_col][key]
 
-    """
-    Returns list of RIDs of all records with the given value on column "column"
-    """
-    def locate(self, key_val, key_col=config.PRIMARY_KEY_COLUMN):
-        return self.indices[key_col].get(key_val, [])  # Return empty list if key is not found
+    '''
+    Update a record's index when the value changes
+    '''
+    def updateRecord(self, old_key, new_key, rid, key_col=config.PRIMARY_KEY_COLUMN):
+        self.removeRecord(old_key, rid, key_col)
+        self.addRecord(new_key, rid, key_col)
 
-    """
-    Returns list of RIDs of all records with values in column "column" between "begin" and "end"
-    """
+    '''
+    Locate RIDs with exact value
+    '''
+    def locate(self, key_val, key_col=config.PRIMARY_KEY_COLUMN):
+        return self.indices[key_col].get(key_val, [])
+
+    '''
+    Locate RIDs within a range
+    '''
     def locate_range(self, begin, end, key_col=config.PRIMARY_KEY_COLUMN):
         if key_col not in self.indices:
             return []
+        return [rid for key in self.indices[key_col].irange(begin, end) for rid in self.indices[key_col][key]]
 
-        if begin > end:
-            begin, end = end, begin
-
-        all_rids = []
-        for key in range(begin, end + 1):
-            all_rids.extend(self.indices[key_col].get(key, []))
-        
-        return all_rids
-
-    """
-    Create index on specific column and populate it with existing data
-    """
+    '''
+    Create index on a specific column
+    '''
     def create_index(self, column_number, table=None):
         if column_number in self.indices:
             print(f"Index already exists for column {column_number}")
             return False
+        self.indices[column_number] = SortedDict()
         
-        self.indices[column_number] = defaultdict(list)
-
-        # scan table reference to populate the index
+        # Populate index using existing table records
         if table:
-            for rid, record in table.records.items():  # I assume table.records stores data
+            for rid, record in table.records.items():
                 self.addRecord(record[column_number], rid, column_number)
-        
+
+        self.save_index()  # Persist changes
         return True
 
-    """
-    Drop index of a specific column
-    """
+    '''
+    Drop index for a column
+    '''
     def drop_index(self, column_number):
         if column_number == config.PRIMARY_KEY_COLUMN:
             print("Error: Can't drop primary key index")
@@ -81,4 +87,21 @@ class Index:
         if column_number not in self.indices:
             return False
         del self.indices[column_number]
+        self.save_index()
         return True
+
+    '''
+    Here on uses pickle
+    Save index to disk
+    '''
+    def save_index(self):
+        with open(self.index_file, "wb") as f:
+            pickle.dump(self.indices, f)
+
+    '''
+    Load index from disk
+    '''
+    def load_index(self):
+        if os.path.exists(self.index_file):
+            with open(self.index_file, "rb") as f:
+                self.indices = pickle.load(f)
