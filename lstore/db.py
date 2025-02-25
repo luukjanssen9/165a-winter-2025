@@ -38,6 +38,9 @@ class Database():
 
     def close(self):
         # TODO: do we have to check if the database is open before closing it?
+        if not self.isOpen:
+            print("error: Database is not open")
+            return False
 
         
         # loop through bufferpool and write dirty pages to disk
@@ -78,10 +81,6 @@ class Database():
 
         # create table directory
         os.mkdir(newpath)
-
-        # TODO: Save table metadata to disk
-        # idk if we need this since we already write to disk on close
-        # self.write_table_metadata(table)
 
         # create table object
         newTable = Table(name=name, path=newpath, num_columns=num_columns, page_directory=key_index, latest_page_range=None)
