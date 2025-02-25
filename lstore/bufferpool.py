@@ -109,19 +109,30 @@ class Bufferpool:
         # get the tailpage number from the base page indirection column
         tail_page_rid = base_page_num.pages[config.INDIRECTION_COLUMN].read(record_num) 
 
+        # TODO: get tail page number (is the tail page RID the same as the tail page number? I don't think so) 
+
         if tail_page_rid == 0:
             # if there is no tail page, then the base page is the tail page
-            full_path = f"{tablepath}/{page_range_num}/b{base_page_num}"
+            full_path = f"{tablepath}/{page_range_num}/b{base_page_num}/col{column_number}"
+            met_path = f"{tablepath}/{page_range_num}/b{base_page_num}/met{column_number}"
         else:
             # if there is a tail page, then we need to find the tail page
-            full_path = f"{tablepath}/{page_range_num}/t{tail_page_rid}"
+            full_path = f"{tablepath}/{page_range_num}/t{tail_page_rid}/col{column_number}"
+            met_path = f"{tablepath}/{page_range_num}/b{tail_page_rid}/met{column_number}"
 
         # read the page from disk
         with open(full_path, 'rb') as data_file:
             page_data = bytearray(data_file.read())
             # data_file.close()
 
-        page = Page(page_data, len(page_data))    
+        # read the metadata from disk
+        with open(full_path, 'rb') as data_file:
+            metadata = data_file.read()
+            # data_file.close()
+
+        # TODO: get the number of records from the metadata
+
+        page = Page(page_data, num_records)    
         #
         # MAKE SURE YOU CREATE AN INDEX FOR THE PAGE
         #
@@ -136,9 +147,37 @@ class Bufferpool:
         
     
     def writeToDisk(self, bufferpoolIndex):
-        # uses bufferpool[bufferpoolIndex]
+        # get bufferpool page
+        page = self.frames[bufferpoolIndex].page
 
+        # get page group number and basePage number from page directory
+        page_range_num, base_page_num, record_num = self.table.page_directory[RID]
 
+        # get the tailpage number from the base page indirection column
+        tail_page_rid = base_page_num.pages[config.INDIRECTION_COLUMN].read(record_num)
+
+        # TODO: get tail page number
+
+        if tail_page_rid == 0:
+            # if there is no tail page, then the base page is the tail page
+            full_path = f"{tablepath}/{page_range_num}/b{base_page_num}/col{column_number}"
+            met_path = f"{tablepath}/{page_range_num}/b{base_page_num}/met{column_number}"
+        else:
+            # if there is a tail page, then we need to find the tail page
+            full_path = f"{tablepath}/{page_range_num}/t{tail_page_rid}/col{column_number}"
+            met_path = f"{tablepath}/{page_range_num}/t{tail_page_rid}/col{column_number}"
+
+        # write the page to disk
+        with open(full_path, 'wb+') as data_file:
+            data_file.write(page.data)
+            # data_file.close()
+
+        # write the metadata to disk
+        with open(full_path, 'w+') as metadata_file:
+            metadata_file.write(page.num_records)
+            # metadata_file.close()
+
+        
         # should call table.save_column
         pass
 
