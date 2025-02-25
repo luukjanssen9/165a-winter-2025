@@ -84,7 +84,7 @@ class Database():
         # self.write_table_metadata(table)
 
         # create table object
-        newTable = Table(name=name, path=newpath, num_columns=num_columns, page_directory=key_index)
+        newTable = Table(name=name, path=newpath, num_columns=num_columns, page_directory=key_index, latest_page_range=None)
         for table in self.tables:
             if table.name == newTable.name:
                 print(f"error: A table with the name \"{table.name}\" already exists")
@@ -137,7 +137,8 @@ class Database():
         path = data["path"]
         key = data["key"]
         num_columns = data["num_columns"]
-        json_page_dir = data["page_directory"]  
+        json_page_dir = data["page_directory"] 
+        latest_page_range = data["latest_page_range"] 
 
         # properly format the page_dir using the json data
         page_directory = {}
@@ -145,7 +146,7 @@ class Database():
             page_directory[i] = (json_page_dir[i]['page_range'], json_page_dir[i]['base_page'], json_page_dir[i]['record_number'])
         
         # create the table with the data from disk, and add it to memory
-        new_table = Table(name=name, path=path, key=key, num_columns=num_columns, page_directory=page_directory)
+        new_table = Table(name=name, path=path, key=key, num_columns=num_columns, page_directory=page_directory, latest_page_range=latest_page_range)
         self.tables.append(new_table)
         return new_table
     
@@ -180,7 +181,8 @@ class Database():
             "path" : table.path,
             "key" : table.key,
             "num_columns" : table.num_columns,
-            "page_directory" : json_page_dir
+            "page_directory" : json_page_dir,
+            "latest_page_range" : table.latest_page_range
         }
 
         # write metadata to disk
