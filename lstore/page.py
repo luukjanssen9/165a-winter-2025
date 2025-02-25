@@ -3,8 +3,8 @@ from lstore import config
 # PHYSICAL PAGE CLASS
 class Page:
 
-    def __init__(self):
-        self.num_records = 0
+    def __init__(self, num_records=0):
+        self.num_records = num_records
         self.data = bytearray(config.ARRAY_SIZE)
 
     def has_capacity(self):
@@ -37,9 +37,10 @@ class Page:
 
 # BASE AND TAIL PAGE CLASS
 class PageGroup():
-    def __init__(self, num_columns, type=config.TAIL_PAGE):
+    def __init__(self, num_columns, type=config.TAIL_PAGE, latest_record_number=0):
         self.pages = []
         self.type = type
+        self.latest_record_number = latest_record_number
         # Initialize pages for each column upfront
         for _ in range(num_columns+4):
             self.pages.append(Page())
@@ -63,19 +64,21 @@ class PageGroup():
 
 # PAGE RANGE CLASS
 class pageRange():
-    def __init__(self, num_columns):
+    def __init__(self, num_columns, latest_bp=0, latest_tp=None, new=True):
         # contains an array of PageGroup (base pages)
         self.base_pages = []
         # contains an array of PageGroup (tail pages)
         self.tail_pages = []
 
-        for i in range(config.PAGE_RANGE_SIZE):
-            self.base_pages.append(PageGroup(num_columns, type=config.BASE_PAGE))
+        self.latest_base_page = latest_bp
+        self.latest_tail_page = latest_tp
+        self.num_columns = num_columns # this is needed as metadata in order to restore the range on open
 
-        self.latest_base_page = 0
-        self.latest_tail_page = None
-        
-    
+        if new: # you dont want to create new base pages on open.
+            for i in range(config.PAGE_RANGE_SIZE):
+                self.base_pages.append(PageGroup(num_columns, type=config.BASE_PAGE))
+
+
     def has_capacity(self):
         if self.base_pages[self.latest_base_page].has_capacity():
             return True
@@ -84,6 +87,4 @@ class pageRange():
         else:
             self.latest_base_page+=1
             return True
-
-
-    
+        
