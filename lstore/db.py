@@ -37,6 +37,10 @@ class Database():
         return True
 
     def close(self):
+        # TODO: do we have to check if the database is open before closing it?
+
+        
+        # loop through bufferpool and write dirty pages to disk
         for frameNum in range(self.bufferpool.frames):
             if self.bufferpool[frameNum].dirty:
                 self.bufferpool.writeToDisk(frameNum) # TODO: idk if this syntax is correct.
