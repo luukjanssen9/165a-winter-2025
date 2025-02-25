@@ -5,6 +5,7 @@ from lstore.page import pageRange, PageGroup
 from lstore.index import Index
 from lstore.page import Page
 from lstore import config
+from lstore.bufferpool import Bufferpool
 
 INDIRECTION_COLUMN = 0 # Each record also includes an indirection column that points to the latest tail record holding the latest update to the record
 RID_COLUMN = 1 # Each record is assigned a unique identier called an RID, which is often the physical location where the record is actually stored.
@@ -38,6 +39,7 @@ class Table:
         self.index = Index()
         self.page_ranges = []
         self.latest_page_range = latest_page_range
+        self.bufferpool:Bufferpool = Bufferpool(config.BUFFERPOOL_MAX_LENGTH)
         pass
 
     def __merge(self):

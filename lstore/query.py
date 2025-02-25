@@ -13,9 +13,9 @@ class Query:
     Queries that succeed should return the result or True
     Any query that crashes (due to exceptions) should return False
     """
-    def __init__(self, table, bufferpool):
+    def __init__(self, table):
         self.table:Table = table
-        self.bufferpool:Bufferpool = bufferpool
+        
         # counter to keep track of the number of records in the table
         self.rid_counter = 1 
     
@@ -44,16 +44,16 @@ class Query:
         offset_number = record_num * config.VALUE_SIZE
         
         # get the RID page from the bufferpool
-        page = self.bufferpool.getBufferpoolPage(rid, config.RID_COLUMN, self.table)
+        page = self.table.bufferpool.getBufferpoolPage(rid, config.RID_COLUMN, self.table)
         # TODO: write to the page
         #base_page.pages[config.RID_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
 
         # get the timestamp page from the bufferpool
-        page = self.bufferpool.getBufferpoolPage(rid, config.TIMESTAMP_COLUMN, self.table)
+        page = self.table.bufferpool.getBufferpoolPage(rid, config.TIMESTAMP_COLUMN, self.table)
         # TODO: write to the page
         #base_page.pages[config.TIMESTAMP_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
         # get the indirection page from the bufferpool
-        page = self.bufferpool.getBufferpoolPage(rid, config.INDIRECTION_COLUMN, self.table)
+        page = self.table.bufferpool.getBufferpoolPage(rid, config.INDIRECTION_COLUMN, self.table)
         # TODO: write to the page
         #base_page.pages[config.INDIRECTION_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
         
@@ -93,7 +93,7 @@ class Query:
         
         # Get the latestpage and check if it has capacity
         # TODO: we do not use latest record here. Do we need it at all?
-        page = self.bufferpool.getBufferpoolPage(self.rid_counter, 0, self.table)
+        page = self.table.bufferpool.getBufferpoolPage(self.rid_counter, 0, self.table)
 
         if page.has_capacity():
             page_range_number = self.table.latest_page_range

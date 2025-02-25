@@ -21,7 +21,7 @@ class Bufferpool:
         # Each bufferpool has a list of base and tail pages (initially empty)
         self.frames = []
         for i in range(max_size):
-            self.frames.append(None)
+            self.frames.append(Frame())
 
     def hasCapacity(self):
         if self.size<self.max_size:
@@ -117,7 +117,7 @@ class Bufferpool:
     
     def readFromDisk(self, RID, column_number, table):
         # get page group number and basePage number from page directory
-        page_range_num, base_page_num, record_num = self.table.page_directory[RID]
+        page_range_num, base_page_num, record_num = table.page_directory[RID]
 
         # get the tailpage number from the base page indirection column
         tail_page_rid = base_page_num.pages[config.INDIRECTION_COLUMN].read(record_num) 

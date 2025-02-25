@@ -8,7 +8,6 @@ class Database():
 
     def __init__(self):
         self.tables = []
-        self.bufferpool = None
         self.isOpen = False
         self.path = None
         
@@ -32,8 +31,9 @@ class Database():
             if os.path.isdir(table):
                 self.get_table(path)
 
-        # create bufferpool
-        self.bufferpool = Bufferpool(config.BUFFERPOOL_MAX_LENGTH) 
+        # set isOpen to True
+        self.isOpen = True
+
         return True
 
     def close(self):
@@ -42,18 +42,18 @@ class Database():
             print("error: Database is not open")
             return False
 
-        
-        # loop through bufferpool and write dirty pages to disk
-        for frameNum in range(self.bufferpool.frames):
-            if self.bufferpool[frameNum].dirty:
-                self.bufferpool.writeToDisk(frameNum) # TODO: idk if this syntax is correct.
+        # loop through all tables and write dirty pages to disk
+        for table in self.tables:
+            # loop through bufferpool and write dirty pages to disk
+            for frameNum in range(table.bufferpool.frames):
+                if table.bufferpool[frameNum].dirty:
+                    table.bufferpool.writeToDisk(frameNum) # TODO: idk if this syntax is correct.
         
         # Close all tables (write metadata to disk)
         for table in self.tables:
             self.close_table(table)
 
         # reset variables
-        self.bufferpool = None
         self.isOpen = False
         self.path = None
         return True
@@ -77,13 +77,13 @@ class Database():
         # check if table directory already exists
         if os.path.isdir(newpath):
             print(f"error: A table with the name \"{name}\" already exists")
-            return None
-
-        # create table directory
-        os.mkdir(newpath)
+        else:
+            # create table directory
+            os.mkdir(newpath)
+        
 
         # create table object
-        newTable = Table(name=name, path=newpath, num_columns=num_columns, page_directory=key_index, latest_page_range=None)
+        newTable = Table(name=name, path=newpath, num_columns=num_columns, page_directory={}, key=key_index, latest_page_range=None) # TODO: what do we do with page directory?
         for table in self.tables:
             if table.name == newTable.name:
                 print(f"error: A table with the name \"{table.name}\" already exists")
