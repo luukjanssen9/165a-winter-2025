@@ -48,11 +48,9 @@ class PageGroup():
         # If there are no pages, we assume capacity for a new page
         if not self.pages:
             return True
-        
-        for page in self.pages:
-            if page.has_capacity():
-                return True
-        return False
+        elif self.pages[0].has_capacity():
+            return True
+        else: return False
 
     def write(self, *record, record_number):
         if not self.has_capacity():
@@ -70,16 +68,22 @@ class pageRange():
         self.base_pages = []
         # contains an array of PageGroup (tail pages)
         self.tail_pages = []
+
         for i in range(config.PAGE_RANGE_SIZE):
             self.base_pages.append(PageGroup(num_columns, type=config.BASE_PAGE))
 
+        self.latest_base_page = 0
+        self.latest_tail_page = None
         
     
     def has_capacity(self):
-        for base_page in self.base_pages:
-            if base_page.has_capacity():
-                return True
-        return False
+        if self.base_pages[self.latest_base_page].has_capacity():
+            return True
+        elif self.latest_base_page==15:
+            return False
+        else:
+            self.latest_base_page+=1
+            return True
 
 
     

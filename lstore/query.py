@@ -78,8 +78,10 @@ class Query:
         # Find available location to write to
         page_range_number, base_page_number, record_number = None, None, None
         
-        # TODO: Loop through bufferpool to find a page with capacity
-        # TODO: if bufferpool is full, find a page with capacity from disk
+
+        # TODO: get the 0th column of the latest pagerange / pagegroup and put it into bufferpool
+        latest_page_range = self.table.latest_page_range
+
         # Iterate over page ranges to find a base page with capacity
         for pr_num, page_range in enumerate(self.table.page_ranges):
             for bp_num, base_page in enumerate(page_range.base_pages):
@@ -90,6 +92,9 @@ class Query:
                     break
             if page_range_number is not None:
                 break
+
+        # find the latest page range
+            # find the latest base page
 
         # If no available space is found, create a new page range
         # Since base pages are created upon page range initialization, we only need to create a new page range

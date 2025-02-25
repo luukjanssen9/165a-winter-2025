@@ -27,7 +27,7 @@ class Table:
     :param index: Index         #Index object for the table
     :param pages: list          #List of pages in the table
     """
-    def __init__(self, name, path, num_columns, key, page_directory):
+    def __init__(self, name, path, num_columns, key, page_directory, latest_page_range):
         self.name = name 
         self.path = path
         self.key = key
@@ -35,6 +35,7 @@ class Table:
         self.page_directory = page_directory # RID - > {page_range_number, base_page_number, record_number} 
         self.index = Index()
         self.page_ranges = []
+        self.latest_page_range = latest_page_range
         pass
 
     def __merge(self):
@@ -65,6 +66,7 @@ class Table:
                 self.save_column(path=path, path_column=j, page=page_range.base_pages[i].pages[j])
                 # TAIL PAGES: t{i}/col{j}
         self.page_ranges.append(page_range)
+        self.latest_page_range+=1
 
     def save_tail_page(self, tail_page, page_range_number):
         # ensure that page range exists
@@ -87,6 +89,9 @@ class Table:
                 self.save_column(path=path, path_column=i, page=tail_page.pages[i])
         # add the tail page to the page range in memory
         self.page_ranges[page_range_number].tail_pages.append(tail_page)
+        if self.page_ranges[page_range_number].latest_tail_page==None:
+            self.page_ranges[page_range_number].latest_tail_page = 0
+        else: self.page_ranges[page_range_number].latest_tail_page += 1
 
         # make sure to replace the `page_range.tail_pages.append()` with a call to this function. you can get page_range_number with `len(self.table.page_ranges)` before calling this func
         return True
