@@ -5,6 +5,8 @@ class Frame:
     def __init__(self):
         self.empty = True
         self.page = None
+        self.path = None
+        self.column_number = None
         self.curr_pins = 0
         self.total_pins = 0
         self.dirty = False
@@ -27,17 +29,19 @@ class Bufferpool:
         else: return False
 
     # if we use this function, then we need to know the RID and record num from the page dir
-    def getBufferpoolPage(self, RID, column_number, tableindex):
-        # check if the page is already in bufferpool
-        for frame in self.frames:
-            # return the page if it is already in bufferpool
+    def getBufferpoolPage(self, RID, column_number, table):
 
-            # loop through records in the page
-            for i in range (0,frame.page.num_records):
+        # check if the page is already in bufferpool:
+        for frame in self.frames: # ensure that frame is not empty
+            if frame.empty:
+                continue
+
+            # return the page if it is already in bufferpool
+            for i in range (0,frame.page.num_records): # loop through records in the page
                 #read each record in the page
                 record = page.read(i)
                 # do the col and RID match
-                if RID == tableindex.indices[column_number][record]: #TODO: check if this is corrects
+                if RID == table.index.indices[column_number][record]: #TODO: check if this is corrects
                 # if RID == frame.page.read(column_number): # Check to make sure that this is correct
                     frame.pinned = True
                     frame.pins+=1
@@ -52,8 +56,8 @@ class Bufferpool:
             self.purge()
 
         # read the page from disk
-        page = self.readFromDisk(RID, column_number, tableindex)
-        if self.add(page)==False:
+        page = self.readFromDisk(RID, column_number, table)
+        if self.add(page, table.path, column_number)==False:
             print("error, buffer pool has no space despite capacity check passing")
             return False
         # Should we unpin the page here??
@@ -85,12 +89,15 @@ class Bufferpool:
         self.pageGroups.remove(i)
 
     # Add a pageGroup to the bufferpool
-    def add(self, page):
+    def add(self, page, path, column_number):
         if self.hasCapacity:
             # Find and open spot in the bufferpool and add the page
             for frame in self.frames:
-                if frame.page == None:
+                if frame.empty:
+                    frame.empty = False
                     frame.page = page
+                    frame.path = path
+                    frame.column_number = column_number
                     self.size += 1
                     return True
                 # else: continue
@@ -99,10 +106,16 @@ class Bufferpool:
     # Remove a page from the bufferpool
     def remove(self, index):
         self.frames[index].page = None
+        self.frames[index].path = None
+        self.frames[index].column_number = None
+        self.frames[index].curr_pins = 0
+        self.frames[index].total_pins = 0
+        self.frames[index].dirty = False
+        self.frames[index].empty = True
         self.size -= 1
         return True
     
-    def readFromDisk(self, RID, column_number, tableindex, tablepath):
+    def readFromDisk(self, RID, column_number, table):
         # get page group number and basePage number from page directory
         page_range_num, base_page_num, record_num = self.table.page_directory[RID]
 
@@ -113,12 +126,12 @@ class Bufferpool:
 
         if tail_page_rid == 0:
             # if there is no tail page, then the base page is the tail page
-            full_path = f"{tablepath}/{page_range_num}/b{base_page_num}/col{column_number}"
-            met_path = f"{tablepath}/{page_range_num}/b{base_page_num}/met{column_number}"
+            full_path = f"{table.path}/{page_range_num}/b{base_page_num}/col{column_number}"
+            met_path = f"{table.path}/{page_range_num}/b{base_page_num}/met{column_number}"
         else:
             # if there is a tail page, then we need to find the tail page
-            full_path = f"{tablepath}/{page_range_num}/t{tail_page_rid}/col{column_number}"
-            met_path = f"{tablepath}/{page_range_num}/b{tail_page_rid}/met{column_number}"
+            full_path = f"{table.path}/{page_range_num}/t{tail_page_rid}/col{column_number}"
+            met_path = f"{table.path}/{page_range_num}/b{tail_page_rid}/met{column_number}"
 
         # read the page from disk
         with open(full_path, 'rb') as data_file:
@@ -126,60 +139,37 @@ class Bufferpool:
             # data_file.close()
 
         # read the metadata from disk
-        with open(full_path, 'rb') as data_file:
-            metadata = data_file.read()
+        with open(met_path, 'rb') as metadata_file:
+            num_records = int(metadata_file.read())
             # data_file.close()
 
-        # TODO: get the number of records from the metadata
-
         page = Page(page_data, num_records)    
-        #
-        # MAKE SURE YOU CREATE AN INDEX FOR THE PAGE
-        #
-        # loop through page records
-        # TODO: Is this correct? should we do this every time we read?
-        for i in range (0,page.num_records):
+
+        # update the index for this record
+        for i in range(page.num_records):
             #read each record in the page
             record = page.read(i)
             # add to index
-            tableindex.indices[column_number][record] = RID
+            table.index.indices[column_number][record] = RID
         return page
         
     
     def writeToDisk(self, bufferpoolIndex):
         # get bufferpool page
-        page = self.frames[bufferpoolIndex].page
+        frame = self.frames[bufferpoolIndex]
 
-        # get page group number and basePage number from page directory
-        page_range_num, base_page_num, record_num = self.table.page_directory[RID]
-
-        # get the tailpage number from the base page indirection column
-        tail_page_rid = base_page_num.pages[config.INDIRECTION_COLUMN].read(record_num)
-
-        # TODO: get tail page number
-
-        if tail_page_rid == 0:
-            # if there is no tail page, then the base page is the tail page
-            full_path = f"{tablepath}/{page_range_num}/b{base_page_num}/col{column_number}"
-            met_path = f"{tablepath}/{page_range_num}/b{base_page_num}/met{column_number}"
-        else:
-            # if there is a tail page, then we need to find the tail page
-            full_path = f"{tablepath}/{page_range_num}/t{tail_page_rid}/col{column_number}"
-            met_path = f"{tablepath}/{page_range_num}/t{tail_page_rid}/col{column_number}"
+        full_path = f"{frame.path}/col{frame.column_number}"
+        met_path = f"{frame.path}/met{frame.column_number}"
 
         # write the page to disk
         with open(full_path, 'wb+') as data_file:
-            data_file.write(page.data)
+            data_file.write(frame.page.data)
             # data_file.close()
 
         # write the metadata to disk
         with open(full_path, 'w+') as metadata_file:
-            metadata_file.write(page.num_records)
+            metadata_file.write(frame.page.num_records)
             # metadata_file.close()
-
-        
-        # should call table.save_column
-        pass
 
 
 
