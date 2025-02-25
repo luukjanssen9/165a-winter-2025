@@ -66,6 +66,7 @@ class Table:
                 self.save_column(path=path, path_column=j, page=page_range.base_pages[i].pages[j])
                 # TAIL PAGES: t{i}/col{j}
         self.page_ranges.append(page_range)
+        self.latest_page_range+=1
 
     def save_tail_page(self, tail_page, page_range_number):
         # ensure that page range exists
