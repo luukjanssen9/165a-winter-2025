@@ -112,8 +112,11 @@ class Bufferpool:
         # add to the buffer pool with self.add()
         pass
     
-    def writeToDisk(self, index):
-        # uses bufferpool[index]
+    def writeToDisk(self, bufferpoolIndex):
+        # uses bufferpool[bufferpoolIndex]
+
+
+        # should call table.save_column
         pass
 
 

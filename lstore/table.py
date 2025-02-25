@@ -2,6 +2,7 @@ import os
 from time import time
 from lstore.index import Index
 from lstore.page import Page
+from lstore import config
 
 INDIRECTION_COLUMN = 0 # Each record also includes an indirection column that points to the latest tail record holding the latest update to the record
 RID_COLUMN = 1 # Each record is assigned a unique identier called an RID, which is often the physical location where the record is actually stored.
@@ -61,8 +62,7 @@ class Table:
             for j in range(page_range.base_pages[i].pages):
                 # make file with column num (page_range.base_pages[i].pages[j] is the j'th file)
                 path = f"{self.path}/{page_range_number}/b{i}"
-                path_offset = f"col{j}"
-                self.save_column(path=path, path_offset=path_offset, page=page_range.base_pages[i].pages[j])
+                self.save_column(path=path, path_column=j, page=page_range.base_pages[i].pages[j])
                 # TAIL PAGES: t{i}/col{j}
         self.page_ranges.append(page_range)
 
@@ -84,22 +84,25 @@ class Table:
         # create columns
         for i in range(tail_page.pages):
                 path = f"{self.path}/{page_range_number}/t{tail_page_number}"
-                path_offset = f"col{i}"
-                self.save_column(path=path, path_offset=path_offset, page=tail_page.pages[i])
+                self.save_column(path=path, path_column=i, page=tail_page.pages[i])
         # add the tail page to the page range in memory
         self.page_ranges[page_range_number].tail_pages.append(tail_page)
 
         # make sure to replace the `page_range.tail_pages.append()` with a call to this function. you can get page_range_number with `len(self.table.page_ranges)` before calling this func
         return True
 
-    def save_column(self, path, path_offset, page):
-        file_path = f"{path}/{path_offset}" 
+    def save_column(self, path, path_column, page):
+        file_path = f"{path}/col{path_column}" 
                              # ex: ./b{i}/col{j}
-        metadata_path = path # ex: ./b{i}/
+        metadata_path = f"{path}/met{path_column}"
+                             # ex: ./b{i}/met{j}
 
-        # TODO: implement physical page saving by putting the full binary data into a file
-        # should be a simple write to the path. the problem is how to write the page's binary data.
-        # we might as well write the metadata while we're here, but i dont think we need to
-        # the metadata should be a simple json that contains nothing but page.num_columns.
-        # metadata file goes to the metadata_path i created above. the actual file goes to file_path.
-        pass
+        # write page.data to data file
+        with open(file_path, 'wb+') as data_file:
+            data_file.write(page.data)
+            # data_file.close()
+
+        # write page.num_records to metadata file
+        with open(metadata_path, 'w+') as metadata_file:
+            metadata_file.write(page.num_records)
+            # metadara_file.close()
