@@ -4,6 +4,7 @@ from lstore.page import Page
 from time import time
 from lstore.page import PageGroup, pageRange
 from lstore import config
+from lstore.bufferpool import Bufferpool
 
 class Query:
     """
@@ -12,8 +13,9 @@ class Query:
     Queries that succeed should return the result or True
     Any query that crashes (due to exceptions) should return False
     """
-    def __init__(self, table):
+    def __init__(self, table, bufferpool):
         self.table:Table = table
+        self.bufferpool:Bufferpool = bufferpool
         # counter to keep track of the number of records in the table
         self.rid_counter = 1 
     
@@ -79,9 +81,22 @@ class Query:
         page_range_number, base_page_number, record_number = None, None, None
         
 
-        # TODO: get the 0th column of the latest pagerange / pagegroup and put it into bufferpool
-        latest_page_range = self.table.latest_page_range
+        # TODO: get the 0th column of the latest pagerange / pagegroup and put it into bufferpool (Rami check if below is good)
+        
+        page = self.bufferpool.getBufferpoolPage(self.rid_counter, 0, self.table)
 
+        if page.has_capacity():
+            page_range_number = self.table.latest_page_range
+            base_page_number = self.table.page_ranges[self.table.latest_page_range].latest_base_page
+            record_number = page.num_records
+        else:
+            # If no available space is found, create a new page range
+            # Is this correct?
+            new_page_range = pageRange(num_columns=self.table.num_columns)
+
+        # TODO: do we need extra checks here?
+
+        '''
         # Iterate over page ranges to find a base page with capacity
         for pr_num, page_range in enumerate(self.table.page_ranges):
             for bp_num, base_page in enumerate(page_range.base_pages):
@@ -92,9 +107,7 @@ class Query:
                     break
             if page_range_number is not None:
                 break
-
-        # find the latest page range
-            # find the latest base page
+        '''
 
         # If no available space is found, create a new page range
         # Since base pages are created upon page range initialization, we only need to create a new page range
@@ -110,13 +123,13 @@ class Query:
         else:
             page_range = self.table.page_ranges[page_range_number]
 
+        # TODO: change the way we are writing? do we loop through pages and give it to the bufferpool? (I dont think so)
         # Write the record
         if not page_range.base_pages[base_page_number].write(*record, record_number=record_number):
             return False  
 
         # Update page directory for hash table
         self.table.page_directory[rid] = (page_range_number, base_page_number, record_number)
-        # TODO: update metadata (page_directory) of table
 
         # Update index
         self.table.index.addRecord(primary_key, rid)

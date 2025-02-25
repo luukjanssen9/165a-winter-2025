@@ -40,6 +40,7 @@ class PageGroup():
     def __init__(self, num_columns, type=config.TAIL_PAGE):
         self.pages = []
         self.type = type
+        self.latest_record_number = 0
         # Initialize pages for each column upfront
         for _ in range(num_columns+4):
             self.pages.append(Page())
