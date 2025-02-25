@@ -42,9 +42,20 @@ class Query:
         # Set the indirection, RID, and Timestam column of the base record to 0 to mark it as deleted
         zeroed = 0
         offset_number = record_num * config.VALUE_SIZE
-        base_page.pages[config.RID_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
-        base_page.pages[config.TIMESTAMP_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
-        base_page.pages[config.INDIRECTION_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
+        
+        # get the RID page from the bufferpool
+        page = self.bufferpool.getBufferpoolPage(rid, config.RID_COLUMN, self.table)
+        # TODO: write to the page
+        #base_page.pages[config.RID_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
+
+        # get the timestamp page from the bufferpool
+        page = self.bufferpool.getBufferpoolPage(rid, config.TIMESTAMP_COLUMN, self.table)
+        # TODO: write to the page
+        #base_page.pages[config.TIMESTAMP_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
+        # get the indirection page from the bufferpool
+        page = self.bufferpool.getBufferpoolPage(rid, config.INDIRECTION_COLUMN, self.table)
+        # TODO: write to the page
+        #base_page.pages[config.INDIRECTION_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
         
         # Update the index to remove the primary key
         self.table.index.indices[config.PRIMARY_KEY_COLUMN][primary_key] = [None]
