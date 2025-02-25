@@ -86,7 +86,19 @@ class pageRange():
     def do_merge(self):
         print("starting merge")
 
-        relevant_base_pages = []
-        for tailP in self.tail_pages:
-            ...
-    
+        relevant_base_page_ids = []
+
+        for tailpage in self.tail_pages:
+            # TODO: M3 - check if committed 
+
+            base_id_col = tailpage.pages[config.BASE_ID_COLUMN]
+            for i in range(512):
+                relevant_base_page_ids.append(base_id_col.read(i))
+        
+        # remove duplicate IDs
+        relevant_base_page_ids = list(set(relevant_base_page_ids))
+            
+        # load relevant base pages
+
+        # consolidate
+        
