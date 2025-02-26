@@ -4,11 +4,11 @@
     "page_directory": {
         "0": {
             "page_range": "3",
-            "base_page": "0",
-            "record_number": "0"
+            "base_page": "23523",
+            "record_number": "5678"
         },
         "1": {
-            "page_range": "3",
+            "page_range": "1",
             "base_page": "0",
             "record_number": "1"
         },

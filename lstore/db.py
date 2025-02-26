@@ -38,6 +38,9 @@ class Database():
 
     def close(self):
         # TODO: do we have to check if the database is open before closing it?
+        if not self.isOpen:
+            print("error: Database is not open")
+            return False
 
         
         # loop through bufferpool and write dirty pages to disk
@@ -79,12 +82,8 @@ class Database():
         # create table directory
         os.mkdir(newpath)
 
-        # TODO: Save table metadata to disk
-        # idk if we need this since we already write to disk on close
-        # self.write_table_metadata(table)
-
         # create table object
-        newTable = Table(name=name, path=newpath, num_columns=num_columns, page_directory=key_index)
+        newTable = Table(name=name, path=newpath, num_columns=num_columns, page_directory=key_index, latest_page_range=None)
         for table in self.tables:
             if table.name == newTable.name:
                 print(f"error: A table with the name \"{table.name}\" already exists")
@@ -137,7 +136,8 @@ class Database():
         path = data["path"]
         key = data["key"]
         num_columns = data["num_columns"]
-        json_page_dir = data["page_directory"]  
+        json_page_dir = data["page_directory"] 
+        latest_page_range = data["latest_page_range"] 
 
         # properly format the page_dir using the json data
         page_directory = {}
@@ -145,7 +145,8 @@ class Database():
             page_directory[i] = (json_page_dir[i]['page_range'], json_page_dir[i]['base_page'], json_page_dir[i]['record_number'])
         
         # create the table with the data from disk, and add it to memory
-        new_table = Table(name=name, path=path, key=key, num_columns=num_columns, page_directory=page_directory)
+        new_table = Table(name=name, path=path, key=key, num_columns=num_columns, page_directory=page_directory, latest_page_range=latest_page_range)
+        new_table.open_page_ranges() # goes through everything inside and reads to memory
         self.tables.append(new_table)
         return new_table
     
@@ -180,7 +181,8 @@ class Database():
             "path" : table.path,
             "key" : table.key,
             "num_columns" : table.num_columns,
-            "page_directory" : json_page_dir
+            "page_directory" : json_page_dir,
+            "latest_page_range" : table.latest_page_range
         }
 
         # write metadata to disk
@@ -188,5 +190,41 @@ class Database():
             # if 0 bytes are written then it failed
             if json_output_file.write(table_metadata)==0:
                 return False
-            # successful because something was written
-            else: return True
+
+        # write metadata for page ranges
+        for i in table.page_ranges:
+            page_range_metadata = {
+                "latest_base_page" : table.page_ranges[i].latest_base_page,
+                "latest_tail_page" : table.page_ranges[i].latest_tail_page,
+                "num_columns" : table.page_ranges[i].num_columns
+            }
+
+            # save the page range's metadata first
+            with open(f'{self.path}/{table.name}/{i}.json', 'w+') as page_range_output_file:
+                # if 0 bytes are written then it failed
+                if page_range_output_file.write(page_range_metadata)==0:
+                    return False
+                
+            # then save all the page groups inside the page range
+            # base pages
+            for j in table.page_ranges[i].base_pages:
+                base_page_metadata = {
+                    "latest_record_number" : table.page_ranges[i].base_pages[j].latest_record_number
+                }
+
+                with open(f'{self.path}/{table.name}/{i}/b{j}.json', 'w+') as base_page_output_file:
+                    # if 0 bytes are written then it failed
+                    if base_page_output_file.write(base_page_metadata)==0:
+                        return False
+                    
+            # tail pages
+            for k in table.page_ranges[i].tail_pages:
+                tail_page_metadata = {
+                    "latest_record_number" : table.page_ranges[i].tail_pages[k].latest_record_number
+                }
+
+                with open(f'{self.path}/{table.name}/{i}/t{k}.json', 'w+') as tail_page_output_file:
+                    # if 0 bytes are written then it failed
+                    if tail_page_output_file.write(tail_page_metadata)==0:
+                        return False
+

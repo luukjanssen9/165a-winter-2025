@@ -2,7 +2,7 @@ import json
 import os
 
 # THIS SEGMENT TESTS TO SEE WHAT IN THE DIRECTORY IS A FOLDER VS A FILE
-# TRUE = FOLDER, FAKSE = FILE
+# TRUE = FOLDER, FALSE = FILE
 # currdir = "."
 # for thing in os.listdir(currdir):
 #     print(f"{thing}: {os.path.isdir(thing)}")
@@ -11,8 +11,8 @@ import os
 # IF IT WORKS, THEN THE CODE SHOULD RUN TO COMPLETION AND COPY ONE OUTPUT TO THE OTHER
 # THEN YOU CAN SWAP THE FILE NAMES AND HAVE IT GO THE OTHER WAY
 # YOU CAN ALSO EDIT A VALUE IN ONE FILE AND WATCH IT CHANGE IN THE OTHER FILE
-path2 = "output"
-path1 = "Grades"
+path1 = "output"
+path2 = "Grades"
 with open(f'{path1}.json', 'r') as table_metadata:
     data = json.load(table_metadata)
 
