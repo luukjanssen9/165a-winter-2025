@@ -187,7 +187,7 @@ class Database():
         }
 
         # write metadata to disk
-        with open(f'{self.path}/{table.name}.json', 'w+') as json_output_file:
+        with open(f'lstore/{self.path}/{table.name}.json', 'w+') as json_output_file:
             # if 0 bytes are written then it failed
             if json_output_file.write(table_metadata)==0:
                 return False
@@ -201,7 +201,7 @@ class Database():
             }
 
             # save the page range's metadata first
-            with open(f'{self.path}/{table.name}/{i}.json', 'w+') as page_range_output_file:
+            with open(f'lstore/{self.path}/{table.name}/{i}.json', 'w+') as page_range_output_file:
                 # if 0 bytes are written then it failed
                 if page_range_output_file.write(page_range_metadata)==0:
                     return False
@@ -213,7 +213,7 @@ class Database():
                     "latest_record_number" : table.page_ranges[i].base_pages[j].latest_record_number
                 }
 
-                with open(f'{self.path}/{table.name}/{i}/b{j}.json', 'w+') as base_page_output_file:
+                with open(f'lstore/{self.path}/{table.name}/{i}/b{j}.json', 'w+') as base_page_output_file:
                     # if 0 bytes are written then it failed
                     if base_page_output_file.write(base_page_metadata)==0:
                         return False
@@ -224,7 +224,7 @@ class Database():
                     "latest_record_number" : table.page_ranges[i].tail_pages[k].latest_record_number
                 }
 
-                with open(f'{self.path}/{table.name}/{i}/t{k}.json', 'w+') as tail_page_output_file:
+                with open(f'lstore/{self.path}/{table.name}/{i}/t{k}.json', 'w+') as tail_page_output_file:
                     # if 0 bytes are written then it failed
                     if tail_page_output_file.write(tail_page_metadata)==0:
                         return False

@@ -111,7 +111,7 @@ class Query:
             # write to the page
             page.write(record[column_number], open_record_number)
         
-        # Update the latest numbers
+        # Update the latest numbers TODO: is this how we should be updating the latest numbers?
         if open_record_number >= config.ARRAY_SIZE/config.VALUE_SIZE:
             open_record_number = 0
             if open_base_page_number >= config.PAGE_RANGE_SIZE:
