@@ -120,6 +120,7 @@ class Bufferpool:
         page_range_num, base_page_num, record_num = table.page_directory[RID]
 
         # TODO: this won't work (base pase number is a number, I thinkwe have to get a page form disk or buferpool)
+        # TODO: also, we don't need tail page for insert
         # get the tailpage number from the base page indirection column
         tail_page_rid = base_page_num.pages[config.INDIRECTION_COLUMN].read(record_num) 
 
