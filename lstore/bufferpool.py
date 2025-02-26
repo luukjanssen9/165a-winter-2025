@@ -119,6 +119,7 @@ class Bufferpool:
         # get page group number and basePage number from page directory
         page_range_num, base_page_num, record_num = table.page_directory[RID]
 
+        # TODO: this won't work (base pase number is a number, I thinkwe have to get a page form disk or buferpool)
         # get the tailpage number from the base page indirection column
         tail_page_rid = base_page_num.pages[config.INDIRECTION_COLUMN].read(record_num) 
 
