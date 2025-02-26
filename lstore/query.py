@@ -89,49 +89,34 @@ class Query:
         record = [indirection, rid, timestamp, schema_encoding] + list(columns)
 
         # Get the next available location
-        page_range_number, base_page_number, record_number = self.table.latest_page_range, self.table.page_ranges[self.table.latest_page_range].latest_base_page, self.table.page_ranges[self.table.latest_page_range].base_pages[self.table.page_ranges[self.table.latest_page_range].latest_base_page].latest_record_number
+        open_page_range_number, open_base_page_number, open_record_number = (self.table.latest_page_range, 
+                                                                             self.table.page_ranges[open_page_range_number].latest_base_page, 
+                                                                             self.table.page_ranges[open_page_range_number].base_pages[open_base_page_number].latest_record_number)
         
         # Update page directory for hash table
-        self.table.page_directory[rid] = (page_range_number, base_page_number, record_number)
+        self.table.page_directory[rid] = (open_page_range_number, open_base_page_number, open_record_number)
 
-        # Get the latestpage and check if it has capacity
-        # TODO: we do not use latest record here. Do we need it at all?
-        page = self.table.bufferpool.getBufferpoolPage(rid, config.RID_COLUMN, self.table)
+        # If open_base_page_number = 0 and open_record_number = 0, we need to create a new page range
+        if open_base_page_number == 0 and open_record_number == 0:
+            # Create a new page range
+            new_page_range = pageRange(self.table.num_columns, latest_bp=0, latest_tp=None, new=True)
+            self.table.page_ranges.append(new_page_range)
+            self.table.latest_page_range = len(self.table.page_ranges) - 1
+            # TODO: do we have to update new to FALSE?
 
-        if not page.has_capacity():
-            page_range_number = self.table.latest_page_range
-            base_page_number = self.table.page_ranges[self.table.latest_page_range].latest_base_page
-            record_number = page.num_records
-
-        # If no available space is found, create a new page range
-        # Since base pages are created upon page range initialization, we only need to create a new page range
-        if page_range_number is None:
-            page_range_number = len(self.table.page_ranges)
-            new_page_range = pageRange(num_columns=self.table.num_columns)  # Create a new page range
-            # self.table.page_ranges.append(new_page_range)
-            self.table.save_page_range(new_page_range)
-            base_page_number = 0 # First base page in the new page range
-            record_number = 0  # First slot in the new page
-
-            page_range = new_page_range  
-        else:
-            page_range = self.table.page_ranges[page_range_number]
-
-        # TODO: change the way we are writing? do we loop through pages and give it to the bufferpool? (I dont think so)
-        # Write the record
-        if not page_range.base_pages[base_page_number].write(*record, record_number=record_number):
-            return False  
+        # Get the latestpage (which should have capacity if we are doing our check at the end right)
+        for column_number in range(self.table.num_columns):
+            # get the page from the bufferpool
+            page = self.table.bufferpool.getBufferpoolPage(rid, column_number, self.table)
+            # write to the page
+            page.write(record[column_number], open_record_number)
         
-        # Update the latest page range and base page
-        self.table.latest_page_range = page_range_number
-        page_range.latest_base_page = base_page_number
-
         # Update the latest numbers
-        if record_number >= config.ARRAY_SIZE/config.VALUE_SIZE:
-            self.table.page_ranges[self.table.latest_page_range].base_pages[self.table.page_ranges[self.table.latest_page_range].latest_base_page].latest_record_number = 0
-            if base_page_number >= config.PAGE_RANGE_SIZE:
-                self.table.page_ranges[self.table.latest_page_range].latest_base_page = 0
-                self.table.latest_page_range += 1
+        if open_record_number >= config.ARRAY_SIZE/config.VALUE_SIZE:
+            open_record_number = 0
+            if open_base_page_number >= config.PAGE_RANGE_SIZE:
+                open_base_page_number = 0
+                open_page_range_number += 1
 
         # Update index
         self.table.index.addRecord(primary_key, rid)
