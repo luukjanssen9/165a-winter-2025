@@ -83,22 +83,28 @@ class pageRange():
         return False
 
 
-    def do_merge(self):
+    def do_merge(self, page_directory):
         print("starting merge")
 
-        relevant_base_page_ids = []
+        relevant_base_rids = []
 
         for tailpage in self.tail_pages:
-            # TODO: M3 - check if committed 
+            # TODO: M3 - check if tail record is committed 
 
             base_id_col = tailpage.pages[config.BASE_ID_COLUMN]
             for i in range(512):
-                relevant_base_page_ids.append(base_id_col.read(i))
+                relevant_base_rids.append(base_id_col.read(i))
         
-        # remove duplicate IDs
-        relevant_base_page_ids = list(set(relevant_base_page_ids))
+        # remove duplicate RIDs
+        relevant_base_rids = list(set(relevant_base_rids))
             
         # load relevant base pages
 
-        # consolidate
-        
+        # consolidate base and newest tail
+        for rid in relevant_base_rids:
+            # get base record location from directory
+            _, base_page_num, record_num = page_directory[rid]
+            basepage = self.base_pages[base_page_num]
+
+            # get tail RID from base record indirection
+            tail_rid = basepage.pages[config.INDIRECTION_COLUMN].read(record_num)
