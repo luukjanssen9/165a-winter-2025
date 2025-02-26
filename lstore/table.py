@@ -39,7 +39,7 @@ class Table:
         self.index = Index()
         self.page_ranges = []
         self.latest_page_range = latest_page_range
-        self.bufferpool:Bufferpool = bufferpool
+        self.bufferpool = bufferpool
         pass
 
     def __merge(self):
@@ -69,6 +69,7 @@ class Table:
                 path = f"{self.path}/{page_range_number}/b{i}"
                 self.save_column(path=path, path_column=j, page=page_range.base_pages[i].pages[j])
                 # TAIL PAGES: t{i}/col{j}
+                # TODO: should the following two lines be in the first for loop?
         self.page_ranges.append(page_range)
         self.latest_page_range+=1
 

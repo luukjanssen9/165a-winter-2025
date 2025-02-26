@@ -89,15 +89,23 @@ class Query:
         record = [indirection, rid, timestamp, schema_encoding] + list(columns)
 
         # Get the next available location
-        open_page_range_number, open_base_page_number, open_record_number = (self.table.latest_page_range, 
-                                                                             self.table.page_ranges[open_page_range_number].latest_base_page, 
-                                                                             self.table.page_ranges[open_page_range_number].base_pages[open_base_page_number].latest_record_number)
+        open_page_range_number = self.table.latest_page_range
+        print(open_page_range_number) 
+        if open_page_range_number is None:
+            new_page_range = pageRange(self.table.num_columns, latest_bp=0, latest_tp=None, new=True)
+            self.table.page_ranges.append(new_page_range)
+            open_page_range_number = 0
+
+
+        open_base_page_number = self.table.page_ranges[open_page_range_number].latest_base_page
+        
+        open_record_number  = self.table.page_ranges[open_page_range_number].base_pages[open_base_page_number].latest_record_number
         
         # Update page directory for hash table
         self.table.page_directory[rid] = (open_page_range_number, open_base_page_number, open_record_number)
 
         # If open_base_page_number = 0 and open_record_number = 0, we need to create a new page range
-        if open_base_page_number == 0 and open_record_number == 0:
+        if open_base_page_number == 0 and open_record_number == 0 and open_page_range_number is not None:
             # Create a new page range
             new_page_range = pageRange(self.table.num_columns, latest_bp=0, latest_tp=None, new=True)
             self.table.page_ranges.append(new_page_range)
@@ -117,6 +125,11 @@ class Query:
             if open_base_page_number >= config.PAGE_RANGE_SIZE:
                 open_base_page_number = 0
                 open_page_range_number += 1
+            else:
+                open_base_page_number += 1
+        else:
+            open_record_number += 1
+
 
         # Update index
         self.table.index.addRecord(primary_key, rid)
