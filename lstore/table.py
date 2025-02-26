@@ -37,12 +37,77 @@ class Table:
         self.page_directory = page_directory # RID - > {page_range_number, base_page_number, record_number} 
         self.index = Index()
         self.page_ranges = []
-        self.latest_page_range = latest_page_range
+        self.latest_page_range = latest_page_range if latest_page_range is not None else 0
+        self.base_id = {}
         pass
 
+
     def __merge(self):
-        print("merge is happening")
-        pass
+        """ Merges tail records into base pages periodically to optimize queries. """
+        for base_id in self.base_id.values():
+            if base_id not in self.page_directory:
+                continue  
+        committed_records = {} 
+        
+        for page_range in self.page_ranges:  
+            for tail_page in reversed(page_range.tail_pages):  # Reverse scan to get latest updates first
+                for record_num in range(tail_page.pages[0].num_records):  
+                    base_id = tail_page.pages[config.BASE_ID_COLUMN].read(record_num)  # Get BaseID
+                    if base_id not in self.page_directory:
+                        continue  # Skip invalid BaseID
+                 
+                    # If this base_id already has a committed record, skip it (we want the latest)
+                    if base_id in committed_records:
+                        continue  
+
+                    committed_records[base_id] = {
+                        "record_num": record_num,
+                        "tail_page": tail_page
+                    }
+
+        outdated_pages = {} 
+        
+        for base_id in committed_records.keys():
+            page_range_num, base_page_num, record_num = self.page_directory[base_id]
+            # TODO: retrieve basepage from bufferpool instead of self.page_ranges
+            # base_page = self.bufferpool.getBufferpoolPage(base_id, 0, self)  
+            base_page = self.page_ranges[page_range_num].base_pages[base_page_num]  # Directly fetch base page
+            outdated_pages[base_id] = {
+                "base_page": base_page,
+                "record_num": record_num
+            }
+
+        for base_id, update_info in committed_records.items():
+            base_page = outdated_pages[base_id]["base_page"]
+            base_record_num = outdated_pages[base_id]["record_num"]
+            tail_page = update_info["tail_page"]
+            tail_record_num = update_info["record_num"]
+            
+            for col_idx in range(self.num_columns):
+                # new_value = tail_page.pages[col_idx].read(tail_record_num)              
+                new_value = tail_page.pages[col_idx].read(tail_record_num)  # No extra offset needed
+                base_page.pages[col_idx+5].write_column(base_record_num, new_value)  # Apply to base page
+
+            # Update TPS (Tail-Page Sequence Number)
+            base_page.set_tps(tail_record_num)
+
+            # Mark the base page as "dirty" in the bufferpool (so it's written to disk)
+            self.bufferpool.frames[base_id].dirty = True  
+
+        for base_id in committed_records.keys():
+            page_range_num, base_page_num, record_num = self.page_directory[base_id]
+            base_page = outdated_pages[base_id]["base_page"]
+            self.page_directory[base_id] = (page_range_num, base_page_num, record_num)  # Update to merged version
+
+        for base_id in outdated_pages.keys():
+            old_base_page = outdated_pages[base_id]["base_page"]
+            
+            self.bufferpool.remove(base_id)
+
+    def test_merge(self):
+        self.__merge() 
+
+
 
     def save_page_range(self, page_range):
         page_range_number = len(self.page_ranges)
@@ -57,12 +122,12 @@ class Table:
         os.mkdir(f"{self.path}/{page_range_number}")
 
         # make folder with page_range name in db/table/
-        for i in range(page_range.base_pages):
+        for i in range(len(page_range.base_pages)):
             # make folder with base page number (page_range.base_pages[i] is the i'th file)
             os.mkdir(f"{self.path}/{page_range_number}/b{i}")
             # TAIL PAGES: os.mkdir(f"{self.path}/{page_range_number}/t{i}")
 
-            for j in range(page_range.base_pages[i].pages):
+            for j in range(len(page_range.base_pages[i].pages)):
                 # make file with column num (page_range.base_pages[i].pages[j] is the j'th file)
                 path = f"{self.path}/{page_range_number}/b{i}"
                 self.save_column(path=path, path_column=j, page=page_range.base_pages[i].pages[j])
@@ -86,7 +151,7 @@ class Table:
         os.mkdir(f"{self.path}/{page_range_number}/t{tail_page_number}")
 
         # create columns
-        for i in range(tail_page.pages):
+        for i in range(len(tail_page.pages)):
                 path = f"{self.path}/{page_range_number}/t{tail_page_number}"
                 self.save_column(path=path, path_column=i, page=tail_page.pages[i])
         # add the tail page to the page range in memory
@@ -113,8 +178,8 @@ class Table:
         }
 
         # write to metadata file
-        with open(metadata_path, 'w+') as metadata_file:
-            metadata_file.write(phys_page_metadata)
+        with open(metadata_path, 'w') as metadata_file:
+            json.dump(phys_page_metadata, metadata_file) 
             # metadara_file.close()
 
     def open_page_ranges(self):
@@ -235,3 +300,4 @@ class Table:
     #                 new_page = Page(num_records=num_records)
     #                 # add page to page group
     #                 page_group.append(new_page)
+
