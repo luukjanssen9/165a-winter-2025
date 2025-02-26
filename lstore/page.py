@@ -67,6 +67,8 @@ class PageGroup():
 # PAGE RANGE CLASS
 class pageRange():
     def __init__(self, num_columns):
+        # num_columns used in merge()
+        self.num_columns = num_columns
         # contains an array of PageGroup (base pages)
         self.base_pages = []
         # contains an array of PageGroup (tail pages)
@@ -99,12 +101,29 @@ class pageRange():
         relevant_base_rids = list(set(relevant_base_rids))
             
         # load relevant base pages
+        ...
 
         # consolidate base and newest tail
         for rid in relevant_base_rids:
             # get base record location from directory
-            _, base_page_num, record_num = page_directory[rid]
+            _, base_page_num, base_record_num = page_directory[rid]
             basepage = self.base_pages[base_page_num]
 
             # get tail RID from base record indirection
-            tail_rid = basepage.pages[config.INDIRECTION_COLUMN].read(record_num)
+            tail_rid = basepage.pages[config.INDIRECTION_COLUMN].read(base_record_num)
+
+            # get tail record location from directory
+            _, tail_page_num, tail_record_num = page_directory[tail_rid]
+            
+            tailpage = self.tail_pages[tail_page_num]
+            
+            # copy all tail record columns into base record
+            for col in range(self.num_columns):
+                tail_val = tailpage.pages[col+6].read(tail_record_num)
+                
+                # change the physical page value in base page
+                physical_page = basepage.pages[col+6]
+                offset_number = tail_record_num * config.VALUE_SIZE
+                physical_page.data[offset_number:offset_number + config.VALUE_SIZE] = tail_val.to_bytes(config.VALUE_SIZE, byteorder='little')
+                
+
