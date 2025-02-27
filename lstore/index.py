@@ -68,14 +68,16 @@ class Index:
             print(f"Index already exists for column {column_number}")
             return False
         self.indices[column_number] = SortedDict()
-        
-        # Populate index using existing table records
+    
         if table:
-            for rid, record in table.records.items():
-                self.addRecord(record[column_number], rid, column_number)
-
-        self.save_index()  # Persist changes
+            for rid in table.page_directory.keys():  # Iterates over all RIDs
+                value = table.getBufferpoolPage(rid, column_number, table)  # Fetches value
+                if value is not None:
+                    self.addRecord(value, rid, column_number)
+    
+        self.save_index()
         return True
+
 
     '''
     Drop index for a column
