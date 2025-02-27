@@ -1,80 +1,109 @@
 """
-A data strucutre holding indices for various columns of a table. Key column should be indexd by default, other columns can be indexed through this object. Indices are usually B-Trees, but other data structures can be used as well.
+A data structure holding indices for various columns of a table. Key column should be indexed by default, other columns can be indexed through this object. Indices are usually B-Trees, but other data structures can be used as well.
 """
-
 from collections import defaultdict
+import pickle
+import os
+from sortedcontainers import SortedDict  # better for range queries
 from lstore import config
 
 class Index:
-
-    def __init__(self):
-        # the index is a dictionary of dictionaries
-        self.indices = defaultdict(lambda: None)
-        # each dictionary in the index dictionary contains the index of its row
-        self.indices[config.PRIMARY_KEY_COLUMN] = defaultdict(lambda: None)
+    def __init__(self, table_name):
+        self.indices = defaultdict(lambda: SortedDict())  # Changed from defaultdict(list) to SortedDict
+        self.table_name = table_name
+        self.index_file = f"{table_name}_index.pkl"
+        
+        # Load index from disk if it exists
+        self.load_index()
 
     '''
     Add new record entry to index
     '''
-    def addRecord(self, key, RID, key_col=config.PRIMARY_KEY_COLUMN):
+    def addRecord(self, key, rid, key_col=config.PRIMARY_KEY_COLUMN):
         if key_col not in self.indices:
-            print(f"no index exists for column {key_col}")
+            print(f"Warning: No index exists for column {key_col}. Skipping index update.")
             return
-        if key not in self.indices[key_col]:
-            self.indices[key_col][key] = [RID]
+        if key in self.indices[key_col]:
+            self.indices[key_col][key].append(rid)
         else:
-            self.indices[key_col][key].append(RID)
+            self.indices[key_col][key] = [rid]
 
-    """
-    # returns list of RIDs of all records with the given value on column "column"
-    """
-    def locate(self, key_val:int, key_col=config.PRIMARY_KEY_COLUMN):
-        if key_col not in self.indices or self.indices[key_col] is None:
-            print(f"no index exists for column {key_col}")
-            return [] # [] ensures function always returns an iterable
-        else:
-            return self.indices[key_col].get(key_val, []) # If value is not found, return an empty list instead of None
+    '''
+    Remove a record entry from index
+    '''
+    def removeRecord(self, key, rid, key_col=config.PRIMARY_KEY_COLUMN):
+        if key_col not in self.indices:
+            return
+        if key in self.indices[key_col]:
+            self.indices[key_col][key].remove(rid)
+            if not self.indices[key_col][key]:  # Remove empty lists
+                del self.indices[key_col][key]
 
+    '''
+    Update a record's index when the value changes
+    '''
+    def updateRecord(self, old_key, new_key, rid, key_col=config.PRIMARY_KEY_COLUMN):
+        self.removeRecord(old_key, rid, key_col)
+        self.addRecord(new_key, rid, key_col)
 
-    """
-    # Returns list of RIDs of all records with values in column "column" between "begin" and "end"
-    """
-    def locate_range(self, begin:int, end:int, key_col=config.PRIMARY_KEY_COLUMN):
-        if self.indices == None:
-            print("error: this column is not indexed")
+    '''
+    Locate RIDs with exact value
+    '''
+    def locate(self, key_val, key_col=config.PRIMARY_KEY_COLUMN):
+        return self.indices[key_col].get(key_val, [])
+
+    '''
+    Locate RIDs within a range
+    '''
+    def locate_range(self, begin, end, key_col=config.PRIMARY_KEY_COLUMN):
+        if key_col not in self.indices:
             return []
+        return [rid for key in self.indices[key_col].irange(begin, end) for rid in self.indices[key_col][key]]
 
-        if begin > end: # ensure that begin is smaller than end
-            begin, end = end, begin
-
-        all_rids = []
-        for key in range(begin, end+1):
-            rids = self.indices[key_col].get(key, None)  # Use `.get()` to prevent `KeyError`
-            if rids is not None:
-                all_rids.extend(rids)
-        
-        return all_rids
-
-    """
-    # optional: Create index on specific column
-    """
-    def create_index(self, column_number):
-        if self.indices[column_number] is not None:
-            print(f"column with number {column_number} already exists")
+    '''
+    Create index on a specific column
+    '''
+    def create_index(self, column_number, table=None):
+        if column_number in self.indices:
+            print(f"Index already exists for column {column_number}")
             return False
-        
-        # create an index for that column number
-        self.indices[column_number] = defaultdict(lambda: None)
+        self.indices[column_number] = SortedDict()
+    
+        if table:
+            for rid in table.page_directory.keys():  # Iterates over all RIDs
+                value = table.getBufferpoolPage(rid, column_number, table)  # Fetches value
+                if value is not None:
+                    self.addRecord(value, rid, column_number)
+    
+        self.save_index()
         return True
 
-    """
-    # optional: Drop index of specific column
-    """
+
+    '''
+    Drop index for a column
+    '''
     def drop_index(self, column_number):
         if column_number == config.PRIMARY_KEY_COLUMN:
-            print("error: cant drop primary key index")
+            print("Error: Can't drop primary key index")
             return False
-        if self.indices[column_number] == None:
+        if column_number not in self.indices:
             return False
-        self.indices[column_number] = None
+        del self.indices[column_number]
+        self.save_index()
         return True
+
+    '''
+    Here on uses pickle
+    Save index to disk
+    '''
+    def save_index(self):
+        with open(self.index_file, "wb") as f:
+            pickle.dump(self.indices, f)
+
+    '''
+    Load index from disk
+    '''
+    def load_index(self):
+        if os.path.exists(self.index_file):
+            with open(self.index_file, "rb") as f:
+                self.indices = pickle.load(f)
