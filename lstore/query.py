@@ -199,9 +199,6 @@ class Query:
 
             # Read the final/latest version of the record
             stored_values = [version_page.pages[i + 5].read(version_record_num) for i in range(self.table.num_columns)]
-
-            stored_primary_key = base_page.pages[config.PRIMARY_KEY_COLUMN].read(record_num)
-
             # Apply column projection
             stored_primary_key = base_page.pages[config.PRIMARY_KEY_COLUMN].read(record_num)
             projected_values = [stored_primary_key] + [
@@ -240,10 +237,10 @@ class Query:
                 base_id = version_page.pages[config.BASE_ID_COLUMN].read(version_record_num)  
                 stored_values = [version_page.pages[i + 5].read(version_record_num) for i in range(self.table.num_columns)]
                 stored_primary_key = base_page.pages[config.PRIMARY_KEY_COLUMN].read(record_num)
-                projected_values = [
+                projected_values = [stored_primary_key] + [
                     stored_values[i] if projected_columns_index[i + 1] else None for i in range(self.table.num_columns - 1)
                 ]
-                records.append(Record(search_key, search_key, projected_values))
+                records.append(Record(stored_primary_key, search_key, projected_values))
 
         return records if records else False
 
@@ -321,7 +318,6 @@ class Query:
         # Update page directory for the new version
         self.table.page_directory[new_rid] = (page_range_num, len(page_range.tail_pages) - 1, tail_record_num)
         if rid not in self.table.page_directory:
-            print(f"⚠️ WARNING: BaseID {rid} was missing in page_directory. Adding it now.")
             page_range_num, base_page_num, record_num = self.table.page_directory[rid]  # Get base location
             self.table.page_directory[rid] = (page_range_num, base_page_num, record_num)
 
