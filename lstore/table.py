@@ -5,6 +5,8 @@ from lstore.page import pageRange, PageGroup
 from lstore.index import Index
 from lstore.page import Page
 from lstore import config
+import threading
+from time import sleep
 
 INDIRECTION_COLUMN = 0 # Each record also includes an indirection column that points to the latest tail record holding the latest update to the record
 RID_COLUMN = 1 # Each record is assigned a unique identier called an RID, which is often the physical location where the record is actually stored.
@@ -39,70 +41,71 @@ class Table:
         self.page_ranges = []
         self.latest_page_range = latest_page_range if latest_page_range is not None else 0
         self.base_id = {}
-        pass
-
+        # Background merge thread setup
+        self.lock = threading.Lock()
+    
+    def run_merge(self):
+        """Runs merge periodically in the background without blocking transactions."""
+        while True:
+            time.sleep(5)  # Merge runs every 5 seconds, can be adjusted
+            self.__merge()
 
     def __merge(self):
         """ Merges tail records into base pages periodically to optimize queries. """
-        for base_id in self.base_id.values():
-            if base_id not in self.page_directory:
-                continue  
-        committed_records = {} 
-        
-        for page_range in self.page_ranges:  
-            for tail_page in reversed(page_range.tail_pages):  # Reverse scan to get latest updates first
-                for record_num in range(tail_page.pages[0].num_records):  
-                    base_id = tail_page.pages[config.BASE_ID_COLUMN].read(record_num)  # Get BaseID
-                    if base_id not in self.page_directory:
-                        continue  # Skip invalid BaseID
-                 
-                    # If this base_id already has a committed record, skip it (we want the latest)
-                    if base_id in committed_records:
-                        continue  
-
-                    committed_records[base_id] = {
-                        "record_num": record_num,
-                        "tail_page": tail_page
-                    }
-
-        outdated_pages = {} 
-        
-        for base_id in committed_records.keys():
-            page_range_num, base_page_num, record_num = self.page_directory[base_id]
-            # TODO: retrieve basepage from bufferpool instead of self.page_ranges
-            # base_page = self.bufferpool.getBufferpoolPage(base_id, 0, self)  
-            base_page = self.page_ranges[page_range_num].base_pages[base_page_num]  # Directly fetch base page
-            outdated_pages[base_id] = {
-                "base_page": base_page,
-                "record_num": record_num
-            }
-
-        for base_id, update_info in committed_records.items():
-            base_page = outdated_pages[base_id]["base_page"]
-            base_record_num = outdated_pages[base_id]["record_num"]
-            tail_page = update_info["tail_page"]
-            tail_record_num = update_info["record_num"]
+        with self.lock:
+            for base_id in self.base_id.values():
+                if base_id not in self.page_directory:
+                    continue  
+            committed_records = {} 
             
-            for col_idx in range(self.num_columns):
-                # new_value = tail_page.pages[col_idx].read(tail_record_num)              
-                new_value = tail_page.pages[col_idx].read(tail_record_num)  # No extra offset needed
-                base_page.pages[col_idx+5].write_column(base_record_num, new_value)  # Apply to base page
+            for page_range in self.page_ranges:  
+                for tail_page in reversed(page_range.tail_pages):  
+                    for record_num in range(tail_page.pages[0].num_records):  
+                        base_id = tail_page.pages[config.BASE_ID_COLUMN].read(record_num) # Get BaseID
+                        if base_id not in self.page_directory:
+                            continue  
+                    
+                        if base_id in committed_records:
+                            continue  
 
-            # Update TPS (Tail-Page Sequence Number)
-            base_page.set_tps(tail_record_num)
+                        committed_records[base_id] = {
+                            "record_num": record_num,
+                            "tail_page": tail_page
+                        }
 
-            # Mark the base page as "dirty" in the bufferpool (so it's written to disk)
-            self.bufferpool.frames[base_id].dirty = True  
-
-        for base_id in committed_records.keys():
-            page_range_num, base_page_num, record_num = self.page_directory[base_id]
-            base_page = outdated_pages[base_id]["base_page"]
-            self.page_directory[base_id] = (page_range_num, base_page_num, record_num)  # Update to merged version
-
-        for base_id in outdated_pages.keys():
-            old_base_page = outdated_pages[base_id]["base_page"]
+            outdated_pages = {} 
             
-            self.bufferpool.remove(base_id)
+            for base_id in committed_records.keys():
+                page_range_num, base_page_num, record_num = self.page_directory[base_id]
+                # TODO: retrieve basepage from bufferpool instead of self.page_ranges
+                # base_page = self.bufferpool.getBufferpoolPage(base_id, 0, self)  
+                base_page = self.page_ranges[page_range_num].base_pages[base_page_num]  # Directly fetch base page
+                outdated_pages[base_id] = {
+                    "base_page": base_page,
+                    "record_num": record_num
+                }
+
+            #  Apply updates from tail pages to base pages (with thread lock)  
+            for base_id, update_info in committed_records.items():
+                base_page = outdated_pages[base_id]["base_page"]
+                base_record_num = outdated_pages[base_id]["record_num"]
+                tail_page = update_info["tail_page"]
+                tail_record_num = update_info["record_num"]
+                for col_idx in range(self.num_columns):
+                    # new_value = tail_page.pages[col_idx].read(tail_record_num)              
+                    new_value = tail_page.pages[col_idx].read(tail_record_num)  
+                    base_page.pages[col_idx+5].write_column(base_record_num, new_value)
+
+                base_page.set_tps(tail_record_num)
+                if base_id in self.bufferpool.frames:
+                    self.bufferpool.frames[base_id].dirty = True  
+            for base_id in committed_records.keys():
+                page_range_num, base_page_num, record_num = self.page_directory[base_id]
+                self.page_directory[base_id] = (page_range_num, base_page_num, record_num)
+
+            for base_id in outdated_pages.keys():            
+                if base_id in self.bufferpool.frames:
+                    self.bufferpool.remove(base_id)
 
     def test_merge(self):
         self.__merge() 
@@ -113,6 +116,8 @@ class Table:
         page_range_number = len(self.page_ranges)
         #0 index so the len gives the next number since we havent appended yet
 
+        if not os.path.exists(self.path):
+            os.makedirs(self.path)
         # check if table directory already exists
         if os.path.isdir(f"{self.path}/{page_range_number}"):
             print(f"error: A page range #{page_range_number} already exists")
