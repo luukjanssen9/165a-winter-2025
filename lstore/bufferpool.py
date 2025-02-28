@@ -167,7 +167,7 @@ class Bufferpool:
             # data_file.close()
 
         # write the metadata to disk
-        with open(full_path, 'w+') as metadata_file:
+        with open(met_path, 'w+') as metadata_file:
             metadata_file.write(frame.page.num_records)
             # metadata_file.close()
 
