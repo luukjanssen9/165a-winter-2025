@@ -72,8 +72,8 @@ class Query:
         schema_encoding = int('0' * self.table.num_columns, 2) 
         timestamp = int(time())  
         indirection = 0 
-        base_id = rid
-        user_columns = list(columns[1:])  # Exclude primary key from user data
+        user_columns = list(columns)  # Exclude primary key from user data
+        base_id = self.table.base_id.get(rid, rid)
 
         # Convert into a full record format
         record = [indirection, rid, timestamp, schema_encoding, base_id] + user_columns
@@ -106,11 +106,9 @@ class Query:
             self.table.save_page_range(new_page_range)
             base_page_number = 0 # First base page in the new page range
             record_number = 0  # First slot in the new page
-
             page_range = new_page_range  
         else:
             page_range = self.table.page_ranges[page_range_number]
-
         # Write the record
         if not page_range.base_pages[base_page_number].write(*record, record_number=record_number):
             return False  
@@ -201,10 +199,10 @@ class Query:
             stored_values = [version_page.pages[i + 5].read(version_record_num) for i in range(self.table.num_columns)]
             # Apply column projection
             stored_primary_key = base_page.pages[config.PRIMARY_KEY_COLUMN].read(record_num)
-            projected_values = [stored_primary_key] + [
+            projected_values =  [
                     stored_values[i] if projected_columns_index[i] else None for i in range(self.table.num_columns)
                 ]            
-            records.append(Record(search_key, search_key, projected_values))
+            records.append(Record(version_record_num, search_key, projected_values))
             # records.append(Record(search_key, search_key, projected_values))
 
         else:
@@ -241,7 +239,6 @@ class Query:
                     stored_values[i] if projected_columns_index[i + 1] else None for i in range(self.table.num_columns - 1)
                 ]
                 records.append(Record(stored_primary_key, search_key, projected_values))
-
         return records if records else False
 
     
@@ -275,8 +272,10 @@ class Query:
 
         stored_values = record[0].columns
         # Get the current values of the record
-        updated_values = [columns[i] if columns[i] is not None else stored_values[i] for i in range(self.table.num_columns)]
-
+        updated_values = [
+            columns[i] if columns[i] is not None else stored_values[i]  
+            for i in range(self.table.num_columns)
+        ]
         # Create a new version of the record
         new_rid = self.rid_counter
         self.rid_counter += 1
@@ -314,6 +313,7 @@ class Query:
         tail_record_num = tail_page_group.pages[-1].num_records
         # Write the new version
         tail_page_group.write(*new_record, record_number=tail_record_num)
+
         tail_page_group.pages[config.BASE_ID_COLUMN].write(base_id, tail_record_num)
         # Update page directory for the new version
         self.table.page_directory[new_rid] = (page_range_num, len(page_range.tail_pages) - 1, tail_record_num)
@@ -329,6 +329,11 @@ class Query:
         offset_number = record_num * config.VALUE_SIZE
         base_page.pages[config.INDIRECTION_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = new_rid.to_bytes(config.VALUE_SIZE, byteorder='little')
 
+        # Merge counter:
+        self.table.merge_counter += 1  # Track number of updates
+        if self.table.merge_counter >= 30:  # Trigger merge after 30 updates
+            self.table.start_merge_thread()
+            self.table.merge_counter = 0  # Reset counter
         return True
     
     """
