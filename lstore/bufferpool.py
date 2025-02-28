@@ -69,6 +69,10 @@ class Bufferpool:
         leastPinnedI = 0
         leastPinnedPins = self.frames[0].total_pins
         for i in range(0, self.frames):
+            # if a frame was accessed 0 or 1 times, evict it rather than checking the rest of the frames.
+            if self.frames[i].total_pins<=1:
+                self.evict(i)
+                return True
             if leastPinnedPins > self.frames[i].total_pins:
                 leastPinnedI = i
 
