@@ -43,73 +43,77 @@ class Table:
         self.base_id = {}
         # Background merge thread setup
         self.lock = threading.Lock()
-    
-    def run_merge(self):
-        """Runs merge periodically in the background without blocking transactions."""
-        while True:
-            time.sleep(5)  # Merge runs every 5 seconds, can be adjusted
-            self.__merge()
+        self.merge_counter = 0  # Track number of merges
 
     def __merge(self):
         """ Merges tail records into base pages periodically to optimize queries. """
-        with self.lock:
-            for base_id in self.base_id.values():
-                if base_id not in self.page_directory:
-                    continue  
-            committed_records = {} 
+        for base_id in self.base_id.values():
+            if base_id not in self.page_directory:
+                continue  
+        committed_records = {} 
+        
+        # Identify the latest committed tail records
+        for page_range in self.page_ranges:  
+            for tail_page in reversed(page_range.tail_pages):  
+                for record_num in range(tail_page.pages[0].num_records):  
+                    base_id = tail_page.pages[config.BASE_ID_COLUMN].read(record_num) # Get BaseID
+                    if base_id not in self.page_directory:
+                        continue  
+                
+                    if base_id in committed_records:
+                        continue  
+
+                    committed_records[base_id] = {
+                        "record_num": record_num,
+                        "tail_page": tail_page
+                    }
+
+        outdated_pages = {} 
+        # Load outdated base pages into bufferpool
+        for base_id in committed_records.keys():
+            page_range_num, base_page_num, record_num = self.page_directory[base_id]
+            # TODO: retrieve basepage from bufferpool instead of self.page_ranges
+            # base_page = self.bufferpool.getBufferpoolPage(base_id, 0, self)  
+            base_page = self.page_ranges[page_range_num].base_pages[base_page_num]  # Directly fetch base page
+            outdated_pages[base_id] = {
+                "base_page": base_page,
+                "record_num": record_num
+            }
+
+        #  Apply updates from tail pages to base pages (without? thread lock)  
+        for base_id, update_info in committed_records.items():
+            base_page = outdated_pages[base_id]["base_page"]
+            base_record_num = outdated_pages[base_id]["record_num"]
+            tail_page = update_info["tail_page"]
+            tail_record_num = update_info["record_num"]
+            for col_idx in range(self.num_columns):
+                # new_value = tail_page.pages[col_idx].read(tail_record_num)              
+                new_value = tail_page.pages[col_idx].read(tail_record_num)  
+                base_page.pages[col_idx+5].write_column(base_record_num, new_value)
             
-            for page_range in self.page_ranges:  
-                for tail_page in reversed(page_range.tail_pages):  
-                    for record_num in range(tail_page.pages[0].num_records):  
-                        base_id = tail_page.pages[config.BASE_ID_COLUMN].read(record_num) # Get BaseID
-                        if base_id not in self.page_directory:
-                            continue  
-                    
-                        if base_id in committed_records:
-                            continue  
-
-                        committed_records[base_id] = {
-                            "record_num": record_num,
-                            "tail_page": tail_page
-                        }
-
-            outdated_pages = {} 
-            
-            for base_id in committed_records.keys():
-                page_range_num, base_page_num, record_num = self.page_directory[base_id]
-                # TODO: retrieve basepage from bufferpool instead of self.page_ranges
-                # base_page = self.bufferpool.getBufferpoolPage(base_id, 0, self)  
-                base_page = self.page_ranges[page_range_num].base_pages[base_page_num]  # Directly fetch base page
-                outdated_pages[base_id] = {
-                    "base_page": base_page,
-                    "record_num": record_num
-                }
-
-            #  Apply updates from tail pages to base pages (with thread lock)  
-            for base_id, update_info in committed_records.items():
-                base_page = outdated_pages[base_id]["base_page"]
-                base_record_num = outdated_pages[base_id]["record_num"]
-                tail_page = update_info["tail_page"]
-                tail_record_num = update_info["record_num"]
-                for col_idx in range(self.num_columns):
-                    # new_value = tail_page.pages[col_idx].read(tail_record_num)              
-                    new_value = tail_page.pages[col_idx].read(tail_record_num)  
-                    base_page.pages[col_idx+5].write_column(base_record_num, new_value)
-
-                base_page.set_tps(tail_record_num)
-                if base_id in self.bufferpool.frames:
-                    self.bufferpool.frames[base_id].dirty = True  
+            base_page.set_tps(tail_record_num)
+            if base_id in self.bufferpool.frames:
+                self.bufferpool.frames[base_id].dirty = True
+        # ONLY LOCK PAGE DIRECTORY UPDATES
+        with self.lock:         
             for base_id in committed_records.keys():
                 page_range_num, base_page_num, record_num = self.page_directory[base_id]
                 self.page_directory[base_id] = (page_range_num, base_page_num, record_num)
+        # Mark old base pages as inactive instead of removing immediately
+        for base_id in outdated_pages.keys():            
+            if base_id in self.bufferpool.frames:
+                self.bufferpool.frames[base_id].valid = False  # Mark as inactive instead of removing
 
-            for base_id in outdated_pages.keys():            
-                if base_id in self.bufferpool.frames:
-                    self.bufferpool.remove(base_id)
+    def start_merge_thread(self):
+        """Starts the background merge thread if not already running."""
+        if not hasattr(self, 'merge_thread') or not self.merge_thread.is_alive():
+            self.merge_thread = threading.Thread(target=self.run_merge, daemon=True)
+            self.merge_thread.start()
 
-    def test_merge(self):
-        self.__merge() 
-
+    def run_merge(self):
+        while self.isOpen:
+            time.sleep(5)  # Adjust interval if needed
+            self.__merge()
 
 
     def save_page_range(self, page_range):
