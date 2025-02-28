@@ -147,7 +147,7 @@ class Database():
             page_directory[i] = (json_page_dir[i]['page_range'], json_page_dir[i]['base_page'], json_page_dir[i]['record_number'])
         
         # get index from disk
-        new_index = self.load_index(path)
+        new_index = self.load_index(name)
 
         if new_index!=None:
             # create the table with the data from disk, and add it to memory
@@ -245,17 +245,17 @@ class Database():
     """
     # save index to disk using pickle
     def save_index(self, table):
-        index_path = f"{table.path}/index.bin"
+        index_path = f"{self.path}/{table.name}.index"
         with open(index_path, "wb+") as f:
             pickle.dump(table.index, f)
 
     # load index from disk using pickle
-    def load_index(self, table_path):
-        index_path = f"{table_path}/index.bin"
+    def load_index(self, table_name):
+        index_path = f"{self.path}/{table_name}.index"
         if os.path.exists(index_path):
             with open(index_path, "rb") as f:
                 new_index = pickle.load(f)
                 return new_index
         else:
-            print(f"WARNING: Index does not exist for Table: {table_path}")
+            print(f"WARNING: Index does not exist for Table \"{table_name}\"")
             return None
