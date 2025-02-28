@@ -92,7 +92,7 @@ class Bufferpool:
         if self.frames[i].dirty:
             self.writeToDisk(i) # might be bufferpool[i]
         
-        self.pageGroups.remove(i)
+        self.remove(i)
 
     # Add a pageGroup to the bufferpool
     def add(self, page, path, column_number):
