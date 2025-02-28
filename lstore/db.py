@@ -3,6 +3,7 @@ from lstore.bufferpool import Bufferpool
 from lstore import config
 import os
 import json
+import shutil
 
 class Database():
 
@@ -104,14 +105,9 @@ class Database():
         # TODO: delete file for table with associated files
         for table in self.tables:
             if table.name==name:
-                # check if file exists
+                # check if directory exists and delete it if so
                 if os.path.isdir(f"{self.path}/{name}"):
-                    # check if directory is empty
-                    if not os.listdir(f"{self.path}/{name}"):
-                        # loop through all files in the directory and remove them
-                        for file in os.listdir(f"{self.path}/{name}"):
-                            os.remove(f"{self.path}/{name}/{file}")
-                    os.rmdir(f"{self.path}/{name}")
+                    shutil.rmtree(f"{self.path}/{name}")
                 self.tables.remove(table)  
                 return True
         # if you get this far without returning, then the table doesnt exist
