@@ -107,3 +107,28 @@ class Index:
         if os.path.exists(self.index_file):
             with open(self.index_file, "rb") as f:
                 self.indices = pickle.load(f)
+
+    '''
+    # bulk index handling
+    '''
+    # for insert
+    def bulk_index_add(self, rid, schema, timestamp, indirection, base_rid, columns):
+        self.addRecord(config.SCHEMA_ENCODING_COLUMN, schema, rid)
+        self.addRecord(config.TIMESTAMP_COLUMN, timestamp, rid)
+        self.addRecord(config.INDIRECTION_COLUMN, indirection, rid)
+        # TODO: ENSURE THAT BASE RID COLUMN IS CORRECTLY NAMED
+        self.addRecord(config.BASE_RID_COLUMN, base_rid, rid)
+        for i in range(len(columns)):
+            # TODO: might be i+5 instead of i+6
+            self.addRecord(key=i+6, rid=rid, key_col=columns[i])
+
+    # for delete
+    def bulk_index_remove(self, rid, schema, timestamp, indirection, base_rid, columns):
+        self.removeRecord(config.SCHEMA_ENCODING_COLUMN, schema, rid)
+        self.removeRecord(config.TIMESTAMP_COLUMN, timestamp, rid)
+        self.removeRecord(config.INDIRECTION_COLUMN, indirection, rid)
+        # TODO: ENSURE THAT BASE RID COLUMN IS CORRECTLY NAMED
+        self.removeRecord(config.BASE_RID_COLUMN, base_rid, rid)
+        for i in range(len(columns)):
+            # TODO: might be i+5 instead of i+6
+            self.removeRecord(key=i+6, rid=rid, key_col=columns[i])

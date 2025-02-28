@@ -149,8 +149,12 @@ class Database():
         # get index from disk
         new_index = self.load_index(path)
 
-        # create the table with the data from disk, and add it to memory
-        new_table = Table(name=name, path=path, key=key, num_columns=num_columns, page_directory=page_directory, latest_page_range=latest_page_range, index=new_index)
+        if new_index!=None:
+            # create the table with the data from disk, and add it to memory
+            new_table = Table(name=name, path=path, key=key, num_columns=num_columns, page_directory=page_directory, latest_page_range=latest_page_range, index=new_index)
+        else: 
+            # if there was no index found, just create a new one by falling back to the default value which creates a new index for this table
+            new_table = Table(name=name, path=path, key=key, num_columns=num_columns, page_directory=page_directory, latest_page_range=latest_page_range)
         new_table.open_page_ranges() # goes through everything inside and reads to memory
         self.tables.append(new_table)
         return new_table
@@ -254,3 +258,4 @@ class Database():
                 return new_index
         else:
             print(f"WARNING: Index does not exist for Table: {table_path}")
+            return None

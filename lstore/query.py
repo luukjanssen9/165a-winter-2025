@@ -44,8 +44,16 @@ class Query:
         base_page.pages[config.TIMESTAMP_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
         base_page.pages[config.INDIRECTION_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = zeroed.to_bytes(config.VALUE_SIZE, byteorder='little')
         
-        # Update the index to remove the primary key
-        self.table.index.indices[config.PRIMARY_KEY_COLUMN][primary_key] = [None]
+        '''
+        # Update the index to remove all traces of this record    
+        '''
+        schema_encoding = base_page.pages[config.SCHEMA_ENCODING_COLUMN].read(record_num)
+        timestamp = base_page.pages[config.TIMESTAMP_COLUMN].read(record_num)
+        indirection = base_page.pages[config.INDIRECTION_COLUMN].read(record_num)
+        # TODO: ensure that base_rid_column is correct
+        base_rid = base_page.pages[config.BASE_RID_COLUMN].read(record_num)
+
+        self.table.index.bulk_index_remove(rid=rid, schema=schema_encoding, timestamp=timestamp, indirection=indirection, base_rid=base_rid)
 
         return True            
     
@@ -93,8 +101,8 @@ class Query:
             if page_range_number is not None:
                 break
 
-        # find the latest page range
-            # find the latest base page
+        # TODO: find the latest page range
+            # TODO: find the latest base page
 
         # If no available space is found, create a new page range
         # Since base pages are created upon page range initialization, we only need to create a new page range
@@ -106,7 +114,7 @@ class Query:
             base_page_number = 0 # First base page in the new page range
             record_number = 0  # First slot in the new page
 
-            page_range = new_page_range  
+            page_range = new_page_range
         else:
             page_range = self.table.page_ranges[page_range_number]
 
@@ -119,7 +127,8 @@ class Query:
         # TODO: update metadata (page_directory) of table
 
         # Update index
-        self.table.index.addRecord(primary_key, rid)
+        self.table.index.bulk_index_add(rid=rid, schema=schema_encoding, timestamp=timestamp, indirection=indirection, base_rid=rid, columns=columns)
+
         return True
 
    
@@ -259,7 +268,8 @@ class Query:
 
         if record is None: # no match -> update fails
             return False  
-    
+
+        
 
         # # Locate the record in the page directory using RID
         page_range_num, base_page_num, record_num = self.table.page_directory[rid]
@@ -269,6 +279,20 @@ class Query:
         stored_values = record[0].columns
         # Get the current values of the record
         updated_values = [columns[i] if columns[i] is not None else stored_values[i] for i in range(self.table.num_columns)]
+
+
+
+        '''
+        # remove old records from index
+        '''
+        old_schema_encoding = base_page.pages[config.SCHEMA_ENCODING_COLUMN].read(record_num)
+        old_timestamp = base_page.pages[config.TIMESTAMP_COLUMN].read(record_num)
+        old_indirection = base_page.pages[config.INDIRECTION_COLUMN].read(record_num)
+        # TODO: ensure that base_rid_column is correct
+        old_base_rid = base_page.pages[config.BASE_RID_COLUMN].read(record_num)
+        self.table.index.bulk_index_remove(rid=rid, schema=old_schema_encoding, timestamp=old_timestamp, indirection=old_indirection, base_rid=old_base_rid)
+
+
 
         # Create a new version of the record
         new_rid = self.rid_counter
@@ -311,6 +335,11 @@ class Query:
         # Update the indirection column of the base record to point to the new version
         offset_number = record_num * config.VALUE_SIZE
         base_page.pages[config.INDIRECTION_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = new_rid.to_bytes(config.VALUE_SIZE, byteorder='little')
+
+        '''
+        # add new values to index
+        '''
+        self.table.index.bulk_index_add(rid=new_rid, schema=schema_encoding, timestamp=timestamp, indirection=indirection, base_rid=rid, columns=updated_values)
 
         return True
     
