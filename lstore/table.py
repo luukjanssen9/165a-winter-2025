@@ -31,13 +31,13 @@ class Table:
     :param index: Index         #Index object for the table
     :param pages: list          #List of pages in the table
     """
-    def __init__(self, name, path, num_columns, key, page_directory, latest_page_range, index=Index()):
+    def __init__(self, name, path, num_columns, key, page_directory, latest_page_range, index=None):
         self.name = name 
         self.path = path
         self.key = key
         self.num_columns = num_columns
         self.page_directory = page_directory # RID - > {page_range_number, base_page_number, record_number} 
-        self.index = index
+        self.index = Index(self.name) if Index is None else index
         self.page_ranges = []
         self.latest_page_range = latest_page_range if latest_page_range is not None else 0
         self.base_id = {}
