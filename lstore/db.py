@@ -3,6 +3,7 @@ from lstore.bufferpool import Bufferpool
 from lstore import config
 import os
 import json
+import pickle
 
 class Database():
 
@@ -102,6 +103,7 @@ class Database():
             return False
         
         # TODO: delete file for table with associated files
+        # do this by using os to find the table.path for the specified table, then deleting the entire folder associated with it.
         for table in self.tables:
             if table.name==name:
                 self.tables.remove(table)  
@@ -144,8 +146,11 @@ class Database():
         for i in json_page_dir:
             page_directory[i] = (json_page_dir[i]['page_range'], json_page_dir[i]['base_page'], json_page_dir[i]['record_number'])
         
+        # get index from disk
+        new_index = self.load_index(path)
+
         # create the table with the data from disk, and add it to memory
-        new_table = Table(name=name, path=path, key=key, num_columns=num_columns, page_directory=page_directory, latest_page_range=latest_page_range)
+        new_table = Table(name=name, path=path, key=key, num_columns=num_columns, page_directory=page_directory, latest_page_range=latest_page_range, index=new_index)
         new_table.open_page_ranges() # goes through everything inside and reads to memory
         self.tables.append(new_table)
         return new_table
@@ -191,6 +196,9 @@ class Database():
             if json_output_file.write(table_metadata)==0:
                 return False
 
+        # write table's index to disk
+        self.save_index(table)
+
         # write metadata for page ranges
         for i in table.page_ranges:
             page_range_metadata = {
@@ -228,3 +236,21 @@ class Database():
                     if tail_page_output_file.write(tail_page_metadata)==0:
                         return False
 
+    """
+    # save and load table indices
+    """
+    # save index to disk using pickle
+    def save_index(self, table):
+        index_path = f"{table.path}/index.bin"
+        with open(index_path, "wb+") as f:
+            pickle.dump(table.index, f)
+
+    # load index from disk using pickle
+    def load_index(self, table_path):
+        index_path = f"{table_path}/index.bin"
+        if os.path.exists(index_path):
+            with open(index_path, "rb") as f:
+                new_index = pickle.load(f)
+                return new_index
+        else:
+            print(f"WARNING: Index does not exist for Table: {table_path}")
