@@ -21,7 +21,7 @@ class Bufferpool:
         # Each bufferpool has a list of base and tail pages (initially empty)
         self.frames = []
         for i in range(max_size):
-            self.frames.append(None)
+            self.frames.append(Frame())
 
     def hasCapacity(self):
         if self.size<self.max_size:

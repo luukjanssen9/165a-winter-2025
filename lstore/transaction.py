@@ -8,7 +8,8 @@ class Transaction:
     """
     def __init__(self):
         self.queries = []
-        pass
+        self.rollback_log = {}
+        self.table = None
 
     """
     # Adds the given query to this transaction
@@ -20,11 +21,20 @@ class Transaction:
     def add_query(self, query, table, *args):
         self.queries.append((query, args))
         # use grades_table for aborting
+        if self.table == None:
+            self.table = table
 
         
     # If you choose to implement this differently this method must still return True if transaction commits or False on abort
     def run(self):
         for query, args in self.queries:
+            if query.__name__ == "update":
+                primary_key = args[0]
+                original_values = self.table.select(primary_key, 0, [1] * self.table.num_columns) 
+    
+                if original_values:
+                    self.rollback_log[primary_key] = original_values[0].columns
+
             result = query(*args)
             # If the query has failed the transaction should abort
             if result == False:
@@ -34,10 +44,22 @@ class Transaction:
     
     def abort(self):
         #TODO: do roll-back and any other necessary operations
+        for primary_key, original_values in self.rollback_log.items():
+            if original_values:
+                success = self.table.update(primary_key, *original_values[0].columns)  
+            if not success:
+                print(f"Error: Rollback failed for primary key {primary_key}")
+        self.rollback_log.clear() 
         return False
 
     
     def commit(self):
         # TODO: commit to database
+        for query, args in self.queries:
+            if query.__name__ == "update":
+                primary_key = args[0]
+                if primary_key in self.rollback_log:
+                    self.table.flush_to_disk(primary_key)  
+        self.rollback_log.clear()
         return True
 
