@@ -3,6 +3,9 @@ from lstore.bufferpool import Bufferpool
 from lstore import config
 import os
 import json
+import threading
+import time 
+
 
 class Database():
 
@@ -28,7 +31,6 @@ class Database():
         self.path = path
         self.isOpen = True
 
-
         # initialize tables into memory
         for table in os.listdir(path):
             full_table_path = os.path.join(path, table) 
@@ -37,6 +39,11 @@ class Database():
 
         # create bufferpool
         self.bufferpool = Bufferpool(config.BUFFERPOOL_MAX_LENGTH) 
+
+        # Start background merge process
+        self.merge_thread = threading.Thread(target=self.run_merge, daemon=True)
+        self.merge_thread.start()
+        print("Merge thread has started!") 
         return True
 
     def close(self):
@@ -56,8 +63,22 @@ class Database():
         self.bufferpool = None
         self.isOpen = False
         self.path = None
+        if self.merge_thread:
+            self.merge_thread.join()  # Stop merge thread before closing
         return True
 
+    def start_merge_thread(self):
+        """Starts the background merge thread."""
+        if not self.merge_thread:
+            self.merge_thread = threading.Thread(target=self.run_merge, daemon=True)
+            self.merge_thread.start()
+
+    def run_merge(self):
+        """Periodically calls merge to optimize database performance."""
+        while self.isOpen:
+            time.sleep(5)  # Adjust the interval as needed
+            for table in self.tables:
+                table.__merge()  # Call merge inside tables
     """
     # Creates a new table
     :param name: string         #Table name
