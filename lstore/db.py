@@ -111,7 +111,7 @@ class Database():
                         # loop through all files in the directory and remove them
                         for file in os.listdir(f"{self.path}/{name}"):
                             os.remove(f"{self.path}/{name}/{file}")
-                        os.rmdir(f"{self.path}/{name}")
+                    os.rmdir(f"{self.path}/{name}")
                 self.tables.remove(table)  
                 return True
         # if you get this far without returning, then the table doesnt exist
