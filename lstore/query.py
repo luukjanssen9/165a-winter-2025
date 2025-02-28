@@ -69,6 +69,7 @@ class Query:
         
         # Get primary key value from record
         primary_key = columns[self.table.key]  
+
         # Check if primary key already exists
         if primary_key in self.table.index.indices[config.PRIMARY_KEY_COLUMN]:
             return False  # Prevent duplicate insertion
@@ -79,10 +80,11 @@ class Query:
         schema_encoding = int('0' * self.table.num_columns, 2) 
         timestamp = int(time())  
         indirection = 0 
-        
-        # Convert into a full record format
-        record = [indirection, rid, timestamp, schema_encoding] + list(columns)
+        user_columns = list(columns)  # Exclude primary key from user data
+        base_id = self.table.base_id.get(rid, rid)
 
+        # Convert into a full record format
+        record = [indirection, rid, timestamp, schema_encoding, base_id] + user_columns
         # Find available location to write to
         page_range_number, base_page_number, record_number = None, None, None
         
@@ -93,7 +95,6 @@ class Query:
         # Iterate over page ranges to find a base page with capacity
         for pr_num, page_range in enumerate(self.table.page_ranges):
             for bp_num, base_page in enumerate(page_range.base_pages):
-                # print(f"Checking capacity for Page Range {pr_num}, Base Page {bp_num}: {base_page.has_capacity()}")
                 if base_page.has_capacity():
                     page_range_number, base_page_number = pr_num, bp_num
                     record_number = base_page.pages[0].num_records  # Use next available slot
@@ -113,11 +114,10 @@ class Query:
             self.table.save_page_range(new_page_range)
             base_page_number = 0 # First base page in the new page range
             record_number = 0  # First slot in the new page
-
-            page_range = new_page_range
+            page_range = new_page_range 
+            
         else:
             page_range = self.table.page_ranges[page_range_number]
-
         # Write the record
         if not page_range.base_pages[base_page_number].write(*record, record_number=record_number):
             return False  
@@ -203,15 +203,15 @@ class Query:
                 relative_version += 1
 
             version_page, version_record_num = versions[relative_version]
+            base_id = version_page.pages[config.BASE_ID_COLUMN].read(version_record_num)
 
             # Read the final/latest version of the record
-            stored_values = [version_page.pages[i + 5].read(version_record_num) for i in range(self.table.num_columns - 1)]
-            stored_primary_key = base_page.pages[config.PRIMARY_KEY_COLUMN].read(record_num)
-
+            stored_values = [version_page.pages[i + 5].read(version_record_num) for i in range(self.table.num_columns)]
             # Apply column projection
-            projected_values = [stored_primary_key] + [
-                stored_values[i] if projected_columns_index[i + 1] else None for i in range(self.table.num_columns - 1)
-            ]
+            stored_primary_key = base_page.pages[config.PRIMARY_KEY_COLUMN].read(record_num)
+            projected_values =  [
+                    stored_values[i] if projected_columns_index[i] else None for i in range(self.table.num_columns)
+                ]            
             records.append(Record(version_record_num, search_key, projected_values))
             # records.append(Record(search_key, search_key, projected_values))
 
@@ -242,13 +242,13 @@ class Query:
 
                 # Read the final/latest version of the record
                 version_page, version_record_num = latest_version
-                stored_values = [version_page.pages[i + 5].read(version_record_num) for i in range(self.table.num_columns - 1)]
+                base_id = version_page.pages[config.BASE_ID_COLUMN].read(version_record_num)  
+                stored_values = [version_page.pages[i + 5].read(version_record_num) for i in range(self.table.num_columns)]
                 stored_primary_key = base_page.pages[config.PRIMARY_KEY_COLUMN].read(record_num)
                 projected_values = [stored_primary_key] + [
                     stored_values[i] if projected_columns_index[i + 1] else None for i in range(self.table.num_columns - 1)
                 ]
                 records.append(Record(stored_primary_key, search_key, projected_values))
-
         return records if records else False
 
     
@@ -258,6 +258,11 @@ class Query:
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
     def update(self, primary_key, *columns):
+        # Check the expected number of columns
+        expected_columns = self.table.num_columns  # Number of user-defined columns (excluding metadata)
+        
+        if len(columns) != expected_columns:
+            return False  # Early exit if column count is incorrect
         # need RID to get base and tail pages
         rid_list = self.table.index.indices[config.PRIMARY_KEY_COLUMN][primary_key]
         if rid_list is None:
@@ -278,6 +283,7 @@ class Query:
 
         stored_values = record[0].columns
         # Get the current values of the record
+
         updated_values = [columns[i] if columns[i] is not None else stored_values[i] for i in range(self.table.num_columns)]
 
 
@@ -292,8 +298,6 @@ class Query:
         old_base_rid = base_page.pages[config.BASE_RID_COLUMN].read(record_num)
         self.table.index.bulk_index_remove(rid=rid, schema=old_schema_encoding, timestamp=old_timestamp, indirection=old_indirection, base_rid=old_base_rid)
 
-
-
         # Create a new version of the record
         new_rid = self.rid_counter
         self.rid_counter += 1
@@ -301,9 +305,13 @@ class Query:
         schema_encoding = int(''.join(['1' if col is not None else '0' for col in columns]), 2)
 
         indirection = base_page_indirection
+        
+        # base_id = self.table.base_id.get(rid, rid)  # Use base_id mapping, or fallback to the original rid
+        base_id = self.table.base_id.get(rid, rid)
 
         # Convert into a full record format
-        new_record = [indirection, new_rid, timestamp, schema_encoding] + updated_values
+        new_record = [indirection, new_rid, timestamp, schema_encoding,  base_id] + updated_values
+
 
         # Find available location to write the new version
         page_range = self.table.page_ranges[page_range_num]
@@ -325,16 +333,30 @@ class Query:
         page_range = self.table.page_ranges[page_range_num]
         tail_page_group = page_range.tail_pages[-1]
         tail_record_num = tail_page_group.pages[-1].num_records
-
         # Write the new version
         tail_page_group.write(*new_record, record_number=tail_record_num)
 
+        tail_page_group.pages[config.BASE_ID_COLUMN].write(base_id, tail_record_num)
         # Update page directory for the new version
         self.table.page_directory[new_rid] = (page_range_num, len(page_range.tail_pages) - 1, tail_record_num)
+        if rid not in self.table.page_directory:
+            page_range_num, base_page_num, record_num = self.table.page_directory[rid]  # Get base location
+            self.table.page_directory[rid] = (page_range_num, base_page_num, record_num)
 
+        self.table.page_directory[new_rid] = (page_range_num, len(self.table.page_ranges[page_range_num].tail_pages) - 1, tail_record_num)
+        if isinstance(rid, int) and rid in self.table.page_directory: 
+            self.table.page_directory[rid] = self.table.page_directory.get(rid, (None, None, None))  
+            self.table.base_id[new_rid] = rid
         # Update the indirection column of the base record to point to the new version
         offset_number = record_num * config.VALUE_SIZE
         base_page.pages[config.INDIRECTION_COLUMN].data[offset_number:offset_number + config.VALUE_SIZE] = new_rid.to_bytes(config.VALUE_SIZE, byteorder='little')
+
+
+        # Merge counter:
+        self.table.merge_counter += 1  # Track number of updates
+        if self.table.merge_counter >= config.UPDATES_BEFORE_MERGE:  # Trigger merge after default 512 updates
+            self.table.start_merge_thread()
+            self.table.merge_counter = 0  # Reset counter
 
         '''
         # add new values to index

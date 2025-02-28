@@ -34,6 +34,11 @@ class Page:
             return None
         offset = record_number * config.VALUE_SIZE
         return int.from_bytes(self.data[offset:offset + config.VALUE_SIZE], byteorder='little')
+    
+    def write_column(self, record_number, value):
+    # Updates a specific column value in the page.
+        offset_number = record_number * config.VALUE_SIZE
+        self.data[offset_number:offset_number + config.VALUE_SIZE] = value.to_bytes(config.VALUE_SIZE, byteorder='little')
 
 # BASE AND TAIL PAGE CLASS
 class PageGroup():
@@ -42,7 +47,7 @@ class PageGroup():
         self.type = type
         self.latest_record_number = latest_record_number
         # Initialize pages for each column upfront
-        for _ in range(num_columns+4):
+        for _ in range(num_columns+5):
             self.pages.append(Page())
 
     def has_capacity(self):
@@ -51,6 +56,9 @@ class PageGroup():
             return True
         elif self.pages[0].has_capacity():
             return True
+        elif self.type == config.TAIL_PAGE:
+        # If the tail page is full, allocate a new one before returning False
+            return False 
         else: return False
 
     def write(self, *record, record_number):
@@ -61,6 +69,15 @@ class PageGroup():
         for page, value in zip(self.pages, record):
             page.write(value, record_number)
         return True
+    
+    def get_tps(self):
+    # Returns the Tail-Page Sequence Number (TPS). 
+        return self.pages[config.TIMESTAMP_COLUMN].read(0)
+
+    def set_tps(self, new_tps):
+        # Updates the Tail-Page Sequence Number (TPS).
+        self.pages[config.TIMESTAMP_COLUMN].write(new_tps, 0)
+
 
 # PAGE RANGE CLASS
 class pageRange():
@@ -87,4 +104,11 @@ class pageRange():
         else:
             self.latest_base_page+=1
             return True
+    
+    def allocate_new_tail_page(self):
+    # Allocates a new tail page when needed
+        new_tail_page = PageGroup(num_columns=self.num_columns, type=config.TAIL_PAGE)
+        self.tail_pages.append(new_tail_page)
+        self.latest_tail_page = len(self.tail_pages) - 1  # Update latest tail page index
+
         

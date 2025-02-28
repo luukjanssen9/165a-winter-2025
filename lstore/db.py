@@ -3,6 +3,8 @@ from lstore.bufferpool import Bufferpool
 from lstore import config
 import os
 import json
+import threading
+import time 
 import pickle
 
 class Database():
@@ -27,14 +29,21 @@ class Database():
         
         # Save the path
         self.path = path
+        self.isOpen = True
 
         # initialize tables into memory
         for table in os.listdir(path):
-            if os.path.isdir(table):
-                self.get_table(path)
+            full_table_path = os.path.join(path, table) 
+            if os.path.isdir(full_table_path):
+                self.get_table(table)
 
         # create bufferpool
         self.bufferpool = Bufferpool(config.BUFFERPOOL_MAX_LENGTH) 
+
+        # Start background merge process
+        self.merge_thread = threading.Thread(target=self.run_merge, daemon=True)
+        self.merge_thread.start()
+        print("Merge thread has started!") 
         return True
 
     def close(self):
@@ -45,9 +54,10 @@ class Database():
 
         
         # loop through bufferpool and write dirty pages to disk
-        for frameNum in range(self.bufferpool.frames):
-            if self.bufferpool[frameNum].dirty:
-                self.bufferpool.writeToDisk(frameNum)
+
+        for frameNum in range(len(self.bufferpool.frames)):
+            if self.bufferpool.frames[frameNum] and self.bufferpool.frames[frameNum].dirty: 
+                self.bufferpool.writeToDisk(frameNum) # TODO: idk if this syntax is correct.
         
         # Close all tables (write metadata to disk)
         for table in self.tables:
@@ -57,8 +67,22 @@ class Database():
         self.bufferpool = None
         self.isOpen = False
         self.path = None
+        if self.merge_thread:
+            self.merge_thread.join()  # Stop merge thread before closing
         return True
 
+    def start_merge_thread(self):
+        """Starts the background merge thread."""
+        if not self.merge_thread:
+            self.merge_thread = threading.Thread(target=self.run_merge, daemon=True)
+            self.merge_thread.start()
+
+    def run_merge(self):
+        """Periodically calls merge to optimize database performance."""
+        while self.isOpen:
+            time.sleep(5)  # Adjust the interval as needed
+            for table in self.tables:
+                table.__merge()  # Call merge inside tables
     """
     # Creates a new table
     :param name: string         #Table name
@@ -84,7 +108,8 @@ class Database():
         os.mkdir(newpath)
 
         # create table object
-        newTable = Table(name=name, path=newpath, num_columns=num_columns, page_directory=key_index, latest_page_range=None)
+        newTable = Table(name=name, path=newpath, num_columns=num_columns, key=key_index,page_directory={}, latest_page_range=None)
+        newTable.bufferpool = self.bufferpool
         for table in self.tables:
             if table.name == newTable.name:
                 print(f"error: A table with the name \"{table.name}\" already exists")
@@ -128,7 +153,6 @@ class Database():
         for table in self.tables:
             if table.name==name:
                 return table
-            
         # if you get this far, then the table isnt in memory yet. 
         with open(f'{self.path}/{name}.json', 'r') as table_metadata:
             data = json.load(table_metadata)
@@ -146,6 +170,7 @@ class Database():
         for i in json_page_dir:
             page_directory[i] = (json_page_dir[i]['page_range'], json_page_dir[i]['base_page'], json_page_dir[i]['record_number'])
         
+
         # get index from disk
         new_index = self.load_index(name)
 
@@ -155,6 +180,7 @@ class Database():
         else: 
             # if there was no index found, just create a new one by falling back to the default value which creates a new index for this table
             new_table = Table(name=name, path=path, key=key, num_columns=num_columns, page_directory=page_directory, latest_page_range=latest_page_range)
+        new_table.bufferpool = self.bufferpool  # Attach bufferpool to table
         new_table.open_page_ranges() # goes through everything inside and reads to memory
         self.tables.append(new_table)
         return new_table
@@ -165,9 +191,9 @@ class Database():
     def close_table(self, table):
         if self.write_table_metadata(table):
             # remove table from db
-            self.tables.remove(table.name)
+            self.tables.remove(table)
             return True
-        else: 
+        else:
             print("writing table to disk failed")
             return False
 
@@ -177,12 +203,12 @@ class Database():
     def write_table_metadata(self, table):
          # get page directory dict
         json_page_dir = {}
-        for i in table.page_directory:
-            json_page_dir[i] = {
-                    "page_range" : table.page_directory[i]['page_range'],
-                    "base_page" : table.page_directory[i]['base_page'],
-                    "record_number" : table.page_directory[i]['record_number']
-                }
+        for rid, (page_range, base_page, record_number) in table.page_directory.items(): 
+            json_page_dir[rid] = {
+            "page_range": page_range,
+            "base_page": base_page,
+            "record_number": record_number
+        }
         
         # create metadata dict
         table_metadata = {
@@ -193,52 +219,62 @@ class Database():
             "page_directory" : json_page_dir,
             "latest_page_range" : table.latest_page_range
         }
+        table_metadata_path = f'{self.path}/{table.name}.json'
+
 
         # write metadata to disk
-        with open(f'{self.path}/{table.name}.json', 'w+') as json_output_file:
-            # if 0 bytes are written then it failed
-            if json_output_file.write(table_metadata)==0:
-                return False
+        with open(table_metadata_path, 'w') as json_output_file:
+            json.dump(table_metadata, json_output_file, indent=4)
+        if os.path.getsize(table_metadata_path) == 0:
+            print(f"error: Failed to write table metadata for {table.name}")
+            return False
 
         # write table's index to disk
         self.save_index(table)
 
         # write metadata for page ranges
-        for i in table.page_ranges:
+        for i, page_range in enumerate(table.page_ranges):  
             page_range_metadata = {
-                "latest_base_page" : table.page_ranges[i].latest_base_page,
-                "latest_tail_page" : table.page_ranges[i].latest_tail_page,
-                "num_columns" : table.page_ranges[i].num_columns
-            }
+                "latest_base_page": page_range.latest_base_page,  
+                "latest_tail_page": page_range.latest_tail_page,
+                "num_columns": page_range.num_columns
+            }       
+            page_range_path = f'{self.path}/{table.name}/{i}.json'
 
             # save the page range's metadata first
-            with open(f'{self.path}/{table.name}/{i}.json', 'w+') as page_range_output_file:
-                # if 0 bytes are written then it failed
-                if page_range_output_file.write(page_range_metadata)==0:
-                    return False
+            with open(page_range_path, 'w') as page_range_output_file:
+                json.dump(page_range_metadata, page_range_output_file, indent=4)
+            
+            # if 0 bytes are written then it failed
+            if os.path.getsize(page_range_path) == 0:
+                print(f"error: Failed to write page range metadata for {table.name}, range {i}")
+                return False
                 
             # then save all the page groups inside the page range
             # base pages
-            for j in table.page_ranges[i].base_pages:
-                base_page_metadata = {
-                    "latest_record_number" : table.page_ranges[i].base_pages[j].latest_record_number
-                }
+            for j, base_page in enumerate(page_range.base_pages):
+                base_page_metadata = {"latest_record_number": base_page.latest_record_number}
+                base_page_path = f'{self.path}/{table.name}/{i}/b{j}.json'
 
-                with open(f'{self.path}/{table.name}/{i}/b{j}.json', 'w+') as base_page_output_file:
-                    # if 0 bytes are written then it failed
-                    if base_page_output_file.write(base_page_metadata)==0:
-                        return False
-                    
+                with open(base_page_path, 'w') as base_page_output_file:
+                    json.dump(base_page_metadata, base_page_output_file, indent=4)
+
+                if os.path.getsize(base_page_path) == 0: 
+                    print(f"error: Failed to write base page metadata for {table.name}, range {i}, base {j}")
+                    return False
             # tail pages
-            for k in table.page_ranges[i].tail_pages:
-                tail_page_metadata = {
-                    "latest_record_number" : table.page_ranges[i].tail_pages[k].latest_record_number
-                }
+            for k, tail_page in enumerate(page_range.tail_pages):
+                tail_page_metadata = {"latest_record_number": tail_page.latest_record_number}
 
-                with open(f'{self.path}/{table.name}/{i}/t{k}.json', 'w+') as tail_page_output_file:
-                    # if 0 bytes are written then it failed
-                    if tail_page_output_file.write(tail_page_metadata)==0:
-                        return False
+                tail_page_path = f'{self.path}/{table.name}/{i}/t{k}.json'
+
+                with open(tail_page_path, 'w') as tail_page_output_file:
+                    json.dump(tail_page_metadata, tail_page_output_file, indent=4)
+
+                if os.path.getsize(tail_page_path) == 0:
+                    print(f"error: Failed to write tail page metadata for {table.name}, range {i}, tail {k}")
+                    return False
+        return True
 
     """
     # save and load table indices
