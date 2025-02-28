@@ -5,7 +5,7 @@ import os
 import json
 import threading
 import time 
-
+import pickle
 
 class Database():
 
@@ -47,10 +47,14 @@ class Database():
         return True
 
     def close(self):
-        # TODO: do we have to check if the database is open before closing it?
+        if not self.isOpen:
+            print("error: Database is not open")
+            # return true because the database is closed and thats what we're checking.
+            return True
 
         
         # loop through bufferpool and write dirty pages to disk
+
         for frameNum in range(len(self.bufferpool.frames)):
             if self.bufferpool.frames[frameNum] and self.bufferpool.frames[frameNum].dirty: 
                 self.bufferpool.writeToDisk(frameNum) # TODO: idk if this syntax is correct.
@@ -103,10 +107,6 @@ class Database():
         # create table directory
         os.mkdir(newpath)
 
-        # TODO: Save table metadata to disk
-        # idk if we need this since we already write to disk on close
-        # self.write_table_metadata(table)
-
         # create table object
         newTable = Table(name=name, path=newpath, num_columns=num_columns, key=key_index,page_directory={}, latest_page_range=None)
         newTable.bufferpool = self.bufferpool
@@ -128,6 +128,7 @@ class Database():
             return False
         
         # TODO: delete file for table with associated files
+        # do this by using os to find the table.path for the specified table, then deleting the entire folder associated with it.
         for table in self.tables:
             if table.name==name:
                 self.tables.remove(table)  
@@ -169,8 +170,16 @@ class Database():
         for i in json_page_dir:
             page_directory[i] = (json_page_dir[i]['page_range'], json_page_dir[i]['base_page'], json_page_dir[i]['record_number'])
         
-        # create the table with the data from disk, and add it to memory
-        new_table = Table(name=name, path=path, key=key, num_columns=num_columns, page_directory=page_directory, latest_page_range=latest_page_range)
+
+        # get index from disk
+        new_index = self.load_index(name)
+
+        if new_index!=None:
+            # create the table with the data from disk, and add it to memory
+            new_table = Table(name=name, path=path, key=key, num_columns=num_columns, page_directory=page_directory, latest_page_range=latest_page_range, index=new_index)
+        else: 
+            # if there was no index found, just create a new one by falling back to the default value which creates a new index for this table
+            new_table = Table(name=name, path=path, key=key, num_columns=num_columns, page_directory=page_directory, latest_page_range=latest_page_range)
         new_table.bufferpool = self.bufferpool  # Attach bufferpool to table
         new_table.open_page_ranges() # goes through everything inside and reads to memory
         self.tables.append(new_table)
@@ -220,6 +229,9 @@ class Database():
             print(f"error: Failed to write table metadata for {table.name}")
             return False
 
+        # write table's index to disk
+        self.save_index(table)
+
         # write metadata for page ranges
         for i, page_range in enumerate(table.page_ranges):  
             page_range_metadata = {
@@ -264,3 +276,22 @@ class Database():
                     return False
         return True
 
+    """
+    # save and load table indices
+    """
+    # save index to disk using pickle
+    def save_index(self, table):
+        index_path = f"{self.path}/{table.name}.index"
+        with open(index_path, "wb+") as f:
+            pickle.dump(table.index, f)
+
+    # load index from disk using pickle
+    def load_index(self, table_name):
+        index_path = f"{self.path}/{table_name}.index"
+        if os.path.exists(index_path):
+            with open(index_path, "rb") as f:
+                new_index = pickle.load(f)
+                return new_index
+        else:
+            print(f"WARNING: Index does not exist for Table \"{table_name}\"")
+            return None

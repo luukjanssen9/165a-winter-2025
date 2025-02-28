@@ -66,11 +66,17 @@ class Bufferpool:
     # Make space for a new page in the bufferpool
     def purge(self):
         # Iterate through the bufferpool to find the page with the least number of pins
+        # this function *could* run into problems if every single frame is pinned, but this is exceedingly unlikely so i will not write code to handle it.
         leastPinnedI = 0
         leastPinnedPins = self.frames[0].total_pins
         for i in range(0, self.frames):
-            if leastPinnedPins > self.frames[i].total_pins:
-                leastPinnedI = i
+            if self.frames[i].curr_pins==0:
+                # if a frame was accessed 0 or 1 times, evict it rather than checking the rest of the frames.
+                if self.frames[i].total_pins<=1:
+                    self.evict(i)
+                    return True
+                if leastPinnedPins > self.frames[i].total_pins:
+                    leastPinnedI = i
 
         # Evict the page with the least number of pins
         self.evict(leastPinnedI)
@@ -167,7 +173,7 @@ class Bufferpool:
             # data_file.close()
 
         # write the metadata to disk
-        with open(full_path, 'w+') as metadata_file:
+        with open(met_path, 'w+') as metadata_file:
             metadata_file.write(frame.page.num_records)
             # metadata_file.close()
 
