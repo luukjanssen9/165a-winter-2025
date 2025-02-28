@@ -3,6 +3,7 @@ from lstore.bufferpool import Bufferpool
 from lstore import config
 import os
 import json
+import shutil
 import threading
 import time 
 import pickle
@@ -131,6 +132,9 @@ class Database():
         # do this by using os to find the table.path for the specified table, then deleting the entire folder associated with it.
         for table in self.tables:
             if table.name==name:
+                # check if directory exists and delete it if so
+                if os.path.isdir(f"{self.path}/{name}"):
+                    shutil.rmtree(f"{self.path}/{name}")
                 self.tables.remove(table)  
                 return True
         # if you get this far without returning, then the table doesnt exist
