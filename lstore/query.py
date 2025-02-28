@@ -69,6 +69,8 @@ class Query:
         
         # Get primary key value from record
         primary_key = columns[self.table.key]  
+        if primary_key==None:
+            return False
 
         # Check if primary key already exists
         if primary_key in self.table.index.indices[config.PRIMARY_KEY_COLUMN]:

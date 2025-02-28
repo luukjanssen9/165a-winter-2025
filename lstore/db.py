@@ -158,7 +158,7 @@ class Database():
             if table.name==name:
                 return table
         # if you get this far, then the table isnt in memory yet. 
-        with open(f'{self.path}/{name}.json', 'r') as table_metadata:
+        with open(f'{self.path}/{name}.json', 'r+') as table_metadata:
             data = json.load(table_metadata)
             
         # get data from the json
